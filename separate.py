@@ -116,6 +116,13 @@ def normalize_spectrogram(magnitude):
 def backend_output_to_tensor(output, device):
     return torch.as_tensor(output, device=device)
 
+
+def select_onnx_providers(use_cuda):
+    available_providers = ort.get_available_providers()
+    if use_cuda and 'CUDAExecutionProvider' in available_providers:
+        return ['CUDAExecutionProvider', 'CPUExecutionProvider']
+    return ['CPUExecutionProvider']
+
 class SeperateAttributes:
     def __init__(self, model_data: ModelData, 
                  process_data: dict, 
@@ -216,7 +223,7 @@ class SeperateAttributes:
         self.deverb_vocal_opt = model_data.deverb_vocal_opt
         self.is_save_vocal_only = model_data.is_save_vocal_only
         self.device = cpu
-        self.run_type = ['CPUExecutionProvider']
+        self.run_type = select_onnx_providers(use_cuda=False)
         self.is_opencl = False
         self.device_set = model_data.device_set
         self.is_use_opencl = model_data.is_use_opencl
@@ -241,7 +248,7 @@ class SeperateAttributes:
                 #     self.is_other_gpu = True
                 if cuda_available:# and not self.is_use_opencl:
                     self.device = CUDA_DEVICE if not device_prefix else f'{device_prefix}:{self.device_set}'
-                    self.run_type = ['CUDAExecutionProvider']
+                    self.run_type = select_onnx_providers(use_cuda=True)
 
         if model_data.process_method == MDX_ARCH_TYPE:
             self.is_mdx_ckpt = model_data.is_mdx_ckpt
@@ -1352,46 +1359,58 @@ def gather_sources(primary_stem_name, secondary_stem_name, secondary_sources: di
     return source_primary, source_secondary
         
 def prepare_mix(mix):
-    
     audio_path = mix
 
     if not isinstance(mix, np.ndarray):
         mix, sr = librosa.load(mix, mono=False, sr=44100)
     else:
-        mix = mix.T
+        if mix.ndim > 2:
+            raise ValueError('Audio arrays must be one-dimensional or two-dimensional')
+        if mix.ndim == 2 and not (
+            mix.shape[0] in (1, 2) and mix.shape[1] > mix.shape[0]
+        ):
+            mix = mix.T
 
     if isinstance(audio_path, str):
-        if not np.any(mix) and audio_path.endswith('.mp3'):
+        if not np.any(mix) and audio_path.lower().endswith('.mp3'):
             mix = rerun_mp3(audio_path)
 
     if mix.ndim == 1:
-        mix = np.asfortranarray([mix,mix])
+        mix = np.asfortranarray([mix, mix])
+    elif mix.shape[0] == 1:
+        mix = np.repeat(mix, 2, axis=0)
 
-    return mix
+    return np.asfortranarray(mix)
+
 
 def rerun_mp3(audio_file, sample_rate=44100):
-
     with audioread.audio_open(audio_file) as f:
         track_length = int(f.duration)
 
     return librosa.load(audio_file, duration=track_length, mono=False, sr=sample_rate)[0]
 
+
+def output_path_for_format(audio_path, output_format):
+    path_without_extension, _ = os.path.splitext(audio_path)
+    return f'{path_without_extension}.{output_format.lower()}'
+
+
 def save_format(audio_path, save_format, mp3_bit_set):
-    
+
     if not save_format == WAV:
-        
+
         if OPERATING_SYSTEM == 'Darwin':
             FFMPEG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
             pydub.AudioSegment.converter = FFMPEG_PATH
-        
+
         musfile = pydub.AudioSegment.from_wav(audio_path)
-        
+
         if save_format == FLAC:
-            audio_path_flac = audio_path.replace(".wav", ".flac")
-            musfile.export(audio_path_flac, format="flac")  
-        
+            audio_path_flac = output_path_for_format(audio_path, FLAC)
+            musfile.export(audio_path_flac, format="flac")
+
         if save_format == MP3:
-            audio_path_mp3 = audio_path.replace(".wav", ".mp3")
+            audio_path_mp3 = output_path_for_format(audio_path, MP3)
             try:
                 musfile.export(audio_path_mp3, format="mp3", bitrate=mp3_bit_set, codec="libmp3lame")
             except Exception as e:

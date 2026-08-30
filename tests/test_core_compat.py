@@ -11,7 +11,14 @@ from demucs.pretrained import get_model
 from demucs.repo import ModelLoadingError
 from lib_v5 import spec_utils
 from lib_v5.tfc_tdf_v3 import STFT
-from separate import backend_output_to_tensor, load_mdx_checkpoint, vr_denoiser
+from separate import (
+    backend_output_to_tensor,
+    load_mdx_checkpoint,
+    output_path_for_format,
+    prepare_mix,
+    select_onnx_providers,
+    vr_denoiser,
+)
 
 
 class CoreCompatibilityTests(unittest.TestCase):
@@ -158,6 +165,71 @@ class CoreCompatibilityTests(unittest.TestCase):
 
         self.assertEqual(converted.device, output.device)
         self.assertEqual(converted.data_ptr(), output.data_ptr())
+
+    def test_prepare_mix_accepts_channel_first_and_sample_first_arrays(self):
+        channel_first = np.ones((2, 100), dtype=np.float32)
+        sample_first = channel_first.T
+
+        prepared_channel_first = prepare_mix(channel_first)
+        prepared_sample_first = prepare_mix(sample_first)
+
+        self.assertEqual(prepared_channel_first.shape, (2, 100))
+        self.assertEqual(prepared_sample_first.shape, (2, 100))
+        self.assertTrue(prepared_channel_first.flags['F_CONTIGUOUS'])
+        self.assertTrue(prepared_sample_first.flags['F_CONTIGUOUS'])
+
+    def test_prepare_mix_expands_mono_arrays_to_stereo(self):
+        mono = np.ones((1, 100), dtype=np.float32)
+
+        prepared = prepare_mix(mono)
+
+        self.assertEqual(prepared.shape, (2, 100))
+        np.testing.assert_array_equal(prepared[0], prepared[1])
+
+    def test_output_conversion_replaces_only_the_final_suffix(self):
+        audio_path = str(Path('folder.wav') / 'Track.WAV')
+
+        mp3_path = output_path_for_format(audio_path, 'MP3')
+        flac_path = output_path_for_format(audio_path, 'FLAC')
+
+        self.assertEqual(mp3_path, str(Path('folder.wav') / 'Track.mp3'))
+        self.assertEqual(flac_path, str(Path('folder.wav') / 'Track.flac'))
+
+    @patch('separate.rerun_mp3')
+    @patch('separate.librosa.load')
+    def test_prepare_mix_retries_uppercase_mp3_files(self, librosa_load, rerun_mp3):
+        librosa_load.return_value = (np.zeros((2, 100), dtype=np.float32), 44_100)
+        rerun_mp3.return_value = np.ones((2, 100), dtype=np.float32)
+
+        prepared = prepare_mix('silent-decode.MP3')
+
+        rerun_mp3.assert_called_once_with('silent-decode.MP3')
+        self.assertTrue(np.all(prepared == 1))
+
+    @patch('separate.ort.get_available_providers')
+    def test_onnx_cuda_provider_keeps_cpu_fallback(self, available_providers):
+        available_providers.return_value = [
+            'CUDAExecutionProvider',
+            'CPUExecutionProvider',
+        ]
+
+        providers = select_onnx_providers(use_cuda=True)
+
+        self.assertEqual(
+            providers,
+            ['CUDAExecutionProvider', 'CPUExecutionProvider'],
+        )
+
+    @patch('separate.ort.get_available_providers')
+    def test_onnx_provider_falls_back_when_cuda_is_unavailable(
+        self,
+        available_providers,
+    ):
+        available_providers.return_value = ['CPUExecutionProvider']
+
+        providers = select_onnx_providers(use_cuda=True)
+
+        self.assertEqual(providers, ['CPUExecutionProvider'])
 
 
 if __name__ == '__main__':
