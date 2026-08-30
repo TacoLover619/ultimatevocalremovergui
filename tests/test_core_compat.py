@@ -101,7 +101,7 @@ class CoreCompatibilityTests(unittest.TestCase):
         self.assertIn('Image.Resampling.LANCZOS', source)
 
     def test_release_version(self):
-        self.assertEqual(VERSION, 'v6.0.0')
+        self.assertEqual(VERSION, 'v6.0.1')
 
     def test_windows_lock_avoids_pytorch_29_dll_regression(self):
         lock_file = Path(__file__).resolve().parents[1] / 'requirements-windows.lock.txt'

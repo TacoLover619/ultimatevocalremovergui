@@ -24,15 +24,15 @@ builds the Windows installer. Outputs are written to:
 
 ```text
 dist\Ultimate Vocal Remover\Ultimate Vocal Remover.exe
-installer\UVR_v6.0.0_setup.exe
-installer\UVR_v6.0.0_setup-*.bin
+installer\UVR_v6.0.1_setup.exe
+installer\UVR_v6.0.1_setup-*.bin
 ```
 
 Keep the entire `Ultimate Vocal Remover` directory together when moving the
 application. The executable depends on its `_internal` directory.
 
-For the installer release, keep `UVR_v6.0.0_setup.exe` and every numbered
-`UVR_v6.0.0_setup-*.bin` payload file together. GitHub requires the split
+For the installer release, keep `UVR_v6.0.1_setup.exe` and every numbered
+`UVR_v6.0.1_setup-*.bin` payload file together. GitHub requires the split
 payload because each release asset must be smaller than 2 GiB.
 
 ## Verify source changes

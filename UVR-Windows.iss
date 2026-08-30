@@ -1,5 +1,5 @@
 #define AppName "Ultimate Vocal Remover"
-#define AppVersion "6.0.0"
+#define AppVersion "6.0.1"
 #define AppPublisher "Ultimate Vocal Remover"
 #define AppExecutable "Ultimate Vocal Remover.exe"
 
@@ -18,7 +18,7 @@ DefaultDirName={localappdata}\Programs\Ultimate Vocal Remover
 DefaultGroupName=Ultimate Vocal Remover
 DisableProgramGroupPage=yes
 OutputDir=installer
-OutputBaseFilename=UVR_v6.0.0_setup
+OutputBaseFilename=UVR_v6.0.1_setup
 SetupIconFile=gui_data\img\GUI-Icon.ico
 UninstallDisplayIcon={app}\{#AppExecutable}
 Compression=lzma2/max
