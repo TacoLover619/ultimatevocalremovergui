@@ -1,15 +1,301 @@
 # Ultimate Vocal Remover GUI v5.6
 
-> **Windows 11 modernization:** The `codex/windows11-modernization` branch adds
-> Python 3.12 support, current audio/ML runtimes, safer checkpoint loading,
-> CUDA 12.6 acceleration, reproducible PyInstaller packaging, and core inference
-> tests. See [WINDOWS_11_MODERNIZATION.md](WINDOWS_11_MODERNIZATION.md) for the
-> complete technical change record and [WINDOWS_BUILD.md](WINDOWS_BUILD.md) for
-> build instructions.
 <img src="https://raw.githubusercontent.com/Anjok07/ultimatevocalremovergui/master/gui_data/img/UVR_v5.6.png?raw=true" />
 
 [![Release](https://img.shields.io/github/release/anjok07/ultimatevocalremovergui.svg)](https://github.com/anjok07/ultimatevocalremovergui/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/anjok07/ultimatevocalremovergui/total.svg)](https://github.com/anjok07/ultimatevocalremovergui/releases)
+
+## Windows 11 modernization branch
+
+The `codex/windows11-modernization` branch is a focused modernization of the
+UVR 5.6 runtime and Windows packaging. It does not replace the interface,
+change the trained separation models, or claim different model quality. It
+updates the software surrounding those models so the existing VR, MDX-Net,
+MDX23C, and Demucs pipelines can run on a current Windows 11, Python, PyTorch,
+Librosa, ONNX, and CUDA stack.
+
+### Tested runtime
+
+The current Windows build was compiled and tested with:
+
+| Component | Tested version |
+| --- | --- |
+| Operating system | Windows 11, 64-bit |
+| Python | 3.12.13 |
+| PyInstaller | 6.22.2 |
+| PyTorch | 2.9.1+cu126 |
+| Torchvision | 0.24.1+cu126 |
+| CUDA runtime | 12.6 |
+| ONNX | 1.22.0 |
+| ONNX Runtime GPU | 1.29.0 |
+| Librosa | 0.11.0 |
+| NumPy | 2.5.2 |
+| SciPy | 1.18.1 |
+| SoundFile | 0.14.0 |
+| FFmpeg | 9.0.1 essentials build |
+| Rubber Band | 3.3.0 GPL executable |
+
+The complete resolved dependency graph is checked in as
+[`requirements-windows.lock.txt`](requirements-windows.lock.txt). The package
+uses NVIDIA CUDA when it is available and retains CPU execution as a fallback.
+
+### Model-loading changes
+
+PyTorch 2.6 changed the default behavior of `torch.load` by making
+`weights_only=True` the default. UVR's original implicit calls were written for
+the older behavior and could fail when loading models on a current PyTorch
+release.
+
+The loading paths in `UVR.py`, `separate.py`, `lib_v5/mdxnet.py`, and
+`demucs/states.py` now explicitly select the correct behavior for each model
+format:
+
+- State dictionaries, mixer weights, and compatible model metadata use
+  `weights_only=True`.
+- Legacy Demucs v1 packages use `weights_only=False` because those files
+  serialize a Python model class in addition to tensor weights.
+- The legacy loader is documented as a trusted-model-only boundary. Files used
+  with that path should come from UVR's official model source.
+
+This keeps older UVR model formats working while applying PyTorch's restricted,
+safer checkpoint loader wherever the stored format supports it.
+
+### Librosa and audio-processing compatibility
+
+The original source pinned Librosa 0.9.2 and passed several arguments
+positionally. Current Librosa versions make those arguments keyword-only. The
+old calls could import successfully and then fail only when a user started an
+actual conversion.
+
+The affected code in `separate.py` and `lib_v5/spec_utils.py` now explicitly
+uses:
+
+- `orig_sr` and `target_sr` for resampling.
+- `n_fft` for short-time Fourier transforms.
+- `sr`, `mono`, `dtype`, and `res_type` for audio loading.
+
+These corrections cover:
+
+- Multiband VR input preparation.
+- Inter-band sample-rate conversion.
+- Pitch adjustment.
+- Legacy VR spectrogram construction.
+- Denoising and dereverberation helpers.
+- Waveform-to-spectrogram conversion used during real model inference.
+
+The last of these was found by running the bundled neural model end to end; it
+would not have been detected by an import-only smoke test.
+
+### Modern PyTorch STFT handling
+
+`lib_v5/tfc_tdf_v3.py` previously requested the deprecated real/imaginary
+layout from `torch.stft(return_complex=False)`.
+
+The updated path now:
+
+1. Calls `torch.stft` with `return_complex=True`.
+2. Converts the native complex tensor with `torch.view_as_real`.
+3. Rearranges it into the same channel layout expected by the existing trained
+   MDX network.
+4. Preserves the established inverse-STFT conversion and output layout.
+
+The model therefore receives the same logical real/imaginary channel data
+without depending on a deprecated PyTorch return format.
+
+### Removed inference-only training framework
+
+`lib_v5/mdxnet.py` inherited from
+`pytorch_lightning.LightningModule`, even though UVR does not use a Lightning
+trainer, callbacks, training loop, logger, or distributed training runtime.
+
+`AbstractMDXNet` now inherits directly from `torch.nn.Module`. Model parameters,
+state dictionaries, forward inference, and optimizer helper methods remain
+available, while the Windows application no longer needs to load or package the
+full PyTorch Lightning training framework.
+
+### FFmpeg and Rubber Band reliability
+
+UVR depends on FFmpeg for compressed audio decoding/encoding and Rubber Band
+for time stretching and pitch shifting. Previously these executables could be
+missed depending on the installation directory and the user's global `PATH`.
+
+`separate.py` now configures the executable search path before importing Pydub:
+
+- A packaged application uses the PyInstaller runtime directory exposed through
+  `sys._MEIPASS`.
+- A source checkout uses `third_party/bin`.
+
+The PyInstaller package includes:
+
+- `ffmpeg.exe`
+- `rubberband.exe`
+- `sndfile.dll`
+
+This prevents Pydub's missing-FFmpeg startup warning and lets both Pydub and
+Pyrubberband find the bundled tools without a separate machine-wide install.
+
+### Dependency cleanup
+
+The Windows dependency definition was rebuilt around the imports and execution
+paths the application actually uses:
+
+- PyTorch and Torchvision are a matched CUDA 12.6 pair.
+- `onnxruntime-gpu` provides both CUDA and CPU execution providers; the
+  conflicting simultaneous installation of `onnxruntime` and
+  `onnxruntime-gpu` was removed.
+- `pytorch_lightning` was removed after the MDX inference class was converted to
+  `torch.nn.Module`.
+- Previously undeclared or unreliable direct dependencies—including
+  `pyrubberband`, `omegaconf`, and `tqdm`—are now declared.
+- `opencv-python-headless` is used because UVR does not require OpenCV's separate
+  GUI toolkit.
+- Direct requirements live in `requirements-windows.in`.
+- Exact tested versions live in `requirements-windows.lock.txt`.
+
+### Reproducible Windows packaging
+
+The branch adds [`UVR-Windows.spec`](UVR-Windows.spec), a checked-in PyInstaller
+definition that:
+
+- Builds `UVR.py` as a windowed 64-bit application.
+- Applies the existing UVR icon.
+- Includes GUI images, fonts, themes, sounds, saved-settings placeholders, and
+  model metadata.
+- Includes the bundled VR denoising model and MDX mixer checkpoint.
+- Collects Librosa and ONNX Runtime data and required native libraries.
+- Includes FFmpeg and Rubber Band in the packaged runtime.
+- Excludes unrelated notebook, test, and distributed-training components where
+  doing so is safe.
+- Produces a directory distribution instead of a one-file executable.
+
+The directory format is intentional. A one-file build would unpack several
+gigabytes of Python, PyTorch, CUDA, ONNX, and audio libraries into a temporary
+directory every time UVR starts.
+
+[`build_windows.ps1`](build_windows.ps1) automates the complete build:
+
+1. Optionally removes and recreates the project virtual environment.
+2. Creates a Python 3.12 virtual environment.
+3. Installs the locked Windows dependencies.
+4. Downloads FFmpeg and Rubber Band from their published distributions.
+5. Extracts the required executables into a stable build location.
+6. Runs PyInstaller with `UVR-Windows.spec`.
+
+The result is written to:
+
+```text
+dist\Ultimate Vocal Remover\Ultimate Vocal Remover.exe
+```
+
+The whole `Ultimate Vocal Remover` directory must remain together because the
+executable depends on its `_internal` directory.
+
+Full rebuild commands and prerequisites are documented in
+[`WINDOWS_BUILD.md`](WINDOWS_BUILD.md).
+
+### Automated core tests
+
+[`tests/test_core_compat.py`](tests/test_core_compat.py) contains four focused
+tests:
+
+1. Loads the bundled VR model and MDX mixer checkpoint using the modern safe
+   PyTorch state-dictionary loader.
+2. Runs the current Librosa resampling path used for pitch changes and validates
+   finite stereo output.
+3. Runs an STFT/inverse-STFT round trip and validates shape and finite samples.
+4. Runs actual neural inference with `UVR-DeNoise-Lite.pth`, then validates that
+   the result matches the input shape and contains only finite samples.
+
+These tests can be run with:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+### Completed verification
+
+The modernization was verified with more than a GUI import check:
+
+- All four core compatibility tests pass.
+- Python bytecode compilation passes for `UVR.py`, `separate.py`, `demucs/`,
+  `lib_v5/`, `gui_data/`, and the tests.
+- The bundled UVR denoising model completes real inference with finite,
+  shape-correct output.
+- PyTorch CUDA inference is active on a tested NVIDIA GeForce RTX 4090.
+- ONNX Runtime successfully executes a graph through
+  `CUDAExecutionProvider`, with `CPUExecutionProvider` retained as fallback.
+- FFmpeg 9.0.1 executes from the packaged runtime.
+- Rubber Band 3.3.0 executes from the packaged runtime.
+- The packaged GUI remains healthy through a 20-second startup smoke test and
+  is then stopped by the test harness.
+- `git diff --check` passes.
+
+The locally tested CUDA package is approximately 5.28 GB. Its executable hash
+was:
+
+```text
+SHA-256: 14CFD703CCA4BDC1CC1C5BE7C7C0146A14E3AC88041BF4E6A58267CF5017C692
+```
+
+The hash identifies that local build only. PyInstaller is not currently
+configured for deterministic byte-for-byte output, so a rebuild can have a
+different hash even when built from the same source.
+
+### Git and release artifact policy
+
+Generated and downloaded files are deliberately excluded from Git:
+
+- `.venv/`
+- `build/`
+- `dist/`
+- `third_party/`
+- Python bytecode caches
+- UVR's generated `data.pkl` settings file
+
+The 5.28 GB CUDA distribution does not belong in normal Git history. It should
+be uploaded separately as a GitHub release asset or hosted externally after any
+desired Authenticode signing step.
+
+Third-party redistribution notes are recorded in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+### Known limitations
+
+- This branch creates a portable PyInstaller directory, not an Inno Setup or
+  NSIS installer.
+- The locally generated executable is not Authenticode-signed.
+- NVIDIA CUDA and ONNX CUDA execution were verified. TensorRT is optional and
+  is not bundled.
+- The repo includes the small VR denoising model already present upstream.
+  Other UVR models continue to use the existing in-application download system.
+- CUDA 12.6 requires a compatible NVIDIA driver. CPU fallback remains available
+  on systems without a compatible NVIDIA GPU.
+- The trained models and separation algorithms were preserved. These changes
+  improve compatibility, loading reliability, packaging, and acceleration; they
+  do not claim newly trained models or inherently different separation quality.
+- The GUI and unrelated utilities were intentionally not redesigned.
+
+### File-level summary
+
+| File | Change |
+| --- | --- |
+| `README.md` | Detailed modernization, verification, packaging, and limitation record |
+| `UVR.py` | Explicit safe loading for model metadata |
+| `separate.py` | Modern model loading, Librosa calls, and bundled binary discovery |
+| `lib_v5/spec_utils.py` | Modern Librosa resampling and STFT calls |
+| `lib_v5/tfc_tdf_v3.py` | Native complex PyTorch STFT handling |
+| `lib_v5/mdxnet.py` | Removed Lightning runtime and safely loaded mixer state |
+| `demucs/states.py` | Explicit legacy Demucs package loading behavior |
+| `gui_data/error_handling.py` | Python 3.12-safe error signature string |
+| `requirements-windows.in` | Direct modern Windows/CUDA dependencies |
+| `requirements-windows.lock.txt` | Exact tested dependency graph |
+| `UVR-Windows.spec` | Reproducible PyInstaller package definition |
+| `build_windows.ps1` | Automated Windows build workflow |
+| `tests/test_core_compat.py` | Core transform, model-loading, and inference tests |
+| `.gitignore` | Excludes generated, downloaded, runtime, and package files |
+| `THIRD_PARTY_NOTICES.md` | FFmpeg and Rubber Band redistribution notice |
+| `WINDOWS_BUILD.md` | Concise rebuild instructions |
+| `WINDOWS_11_MODERNIZATION.md` | Extended standalone technical record |
 
 ## About
 
