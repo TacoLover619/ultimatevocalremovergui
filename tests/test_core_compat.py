@@ -430,6 +430,14 @@ class CoreCompatibilityTests(unittest.TestCase):
 
         remove.assert_not_called()
 
+    @patch('separate.os.remove', side_effect=OSError('permission denied'))
+    @patch('separate.pydub.AudioSegment.from_wav')
+    def test_save_format_keeps_export_when_wav_cleanup_fails(self, from_wav, remove):
+        converted = save_format('track.wav', 'FLAC', '320k')
+
+        self.assertEqual(converted, 'track.flac')
+        remove.assert_called_once_with('track.wav')
+
     @patch('separate.rerun_mp3')
     @patch('separate.librosa.load')
     def test_prepare_mix_retries_uppercase_mp3_files(self, librosa_load, rerun_mp3):

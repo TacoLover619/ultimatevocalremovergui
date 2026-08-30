@@ -12,6 +12,14 @@ def test_clean_output_base_appends_date_and_time():
     )
 
 
+def test_clean_output_base_distinguishes_batch_files():
+    timestamp = datetime(2026, 8, 30, 16, 5, 9)
+
+    assert clean_output_base('C:/Voice Samples/voice.wav', timestamp, batch_index=2) == (
+        'voice_clean_2026-08-30_16-05-09_2'
+    )
+
+
 def test_default_output_directory_matches_input(tmp_path):
     input_file = tmp_path / 'voice.wav'
 

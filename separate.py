@@ -1475,7 +1475,10 @@ def save_format(audio_path, output_format, mp3_bit_set):
             print(error)
             audio.export(converted_path, format='mp3', bitrate=mp3_bit_set)
 
-    os.remove(audio_path)
+    try:
+        os.remove(audio_path)
+    except OSError as error:
+        print(f'Unable to remove temporary WAV file "{audio_path}": {error}')
     return converted_path
             
 def pitch_shift(mix):
