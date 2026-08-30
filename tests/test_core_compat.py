@@ -1,3 +1,4 @@
+import ast
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -22,6 +23,35 @@ from separate import (
 
 
 class CoreCompatibilityTests(unittest.TestCase):
+    @staticmethod
+    def _top_level_imports(path):
+        imports = []
+        for node in ast.parse(path.read_text(encoding='utf-8')).body:
+            if isinstance(node, ast.Import):
+                imports.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.append(node.module)
+        return imports
+
+    def test_uvr_initializes_torch_before_native_gui_and_audio_imports(self):
+        imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'UVR.py')
+        torch_index = imports.index('torch')
+        for module_name in ('audioread', 'gui_data.sv_ttk', 'librosa', 'pyglet'):
+            self.assertLess(torch_index, imports.index(module_name))
+
+    def test_separator_initializes_torch_before_native_inference_libraries(self):
+        imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'separate.py')
+        torch_index = imports.index('torch')
+        for module_name in ('scipy', 'audioread', 'librosa', 'onnxruntime'):
+            self.assertLess(torch_index, imports.index(module_name))
+
+    def test_pillow_resize_uses_supported_resampling_api(self):
+        source = (
+            Path(__file__).resolve().parents[1] / 'gui_data' / 'app_size_values.py'
+        ).read_text(encoding='utf-8')
+        self.assertNotIn('Image.ANTIALIAS', source)
+        self.assertIn('Image.Resampling.LANCZOS', source)
+
     def test_release_version(self):
         self.assertEqual(VERSION, 'v6.0.0')
 

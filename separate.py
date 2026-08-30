@@ -14,6 +14,9 @@ _binary_path = (
 if os.path.isdir(_binary_path):
     os.environ['PATH'] = _binary_path + os.pathsep + os.environ.get('PATH', '')
 
+# Initialize PyTorch before other native scientific and audio runtimes.
+import torch
+
 from demucs.apply import apply_model, demucs_segments
 from demucs.hdemucs import HDemucs
 from demucs.model_v2 import auto_load_demucs_model_v2
@@ -35,7 +38,6 @@ import librosa
 import math
 import numpy as np
 import onnxruntime as ort
-import torch
 import warnings
 import pydub
 import soundfile as sf
