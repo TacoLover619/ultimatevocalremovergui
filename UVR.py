@@ -58,7 +58,6 @@ import re
 import sys
 import yaml
 from ml_collections import ConfigDict
-from collections import Counter
 
 # if not is_macos:
 #     import torch_directml
@@ -153,7 +152,7 @@ def close_process(q:queue.Queue):
                     try:
                         with open(SPLASH_DOC, 'w') as f:
                             f.write('1')
-                    except:
+                    except Exception:
                         print('No splash screen.')
 
     thread = KThread(target=close_splash)
@@ -738,7 +737,7 @@ class ModelData():
                     with open(self.model_path, 'rb') as f:
                         f.seek(- 10000 * 1024, 2)
                         self.model_hash = hashlib.md5(f.read()).hexdigest()
-                except:
+                except Exception:
                     self.model_hash = hashlib.md5(open(self.model_path,'rb').read()).hexdigest()
                     
                 table_entry = {self.model_path: self.model_hash}
@@ -2089,7 +2088,13 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
     def focus_out_widgets(self, all_widgets, frame):
         for option in all_widgets:
             if not type(option) is ComboBoxEditableMenu:
-                option.bind('<Button-1>', lambda e:(option.focus(), self.combo_box_selection_clear(frame)))
+                option.bind(
+                    '<Button-1>',
+                    lambda e, widget=option: (
+                        widget.focus(),
+                        self.combo_box_selection_clear(frame),
+                    ),
+                )
 
     def bind_widgets(self):
         """Bind widgets to the drag & drop mechanic"""
@@ -2504,7 +2509,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         try:
             with audioread.audio_open(audio_file) as f:
                 track_length = int(f.duration)
-        except Exception as e:
+        except Exception:
             print('Audioread failed to get duration. Trying Librosa...')
             y, sr = librosa.load(audio_file, mono=False, sr=44100)
             track_length = int(librosa.get_duration(y=y, sr=sr))
@@ -2532,10 +2537,10 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
     def right_click_select_settings_sub(self, parent_menu, process_method):
         saved_settings_sub_menu = tk.Menu(parent_menu, font=(MAIN_FONT_NAME, FONT_SIZE_1), tearoff=False)
         settings_options = self.last_found_settings + tuple(SAVE_SET_OPTIONS)
-        
-        for settings_options in settings_options:
-            settings_options = settings_options.replace("_", " ")
-            saved_settings_sub_menu.add_command(label=settings_options, command=lambda o=settings_options:self.selection_action_saved_settings(o, process_method=process_method))
+
+        for settings_option in settings_options:
+            settings_option = settings_option.replace("_", " ")
+            saved_settings_sub_menu.add_command(label=settings_option, command=lambda o=settings_option:self.selection_action_saved_settings(o, process_method=process_method))
 
         saved_settings_sub_menu.insert_separator(len(self.last_found_settings))
         
@@ -4289,7 +4294,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                         with urllib.request.urlopen(config_link) as response:
                             with open(config_local, 'wb') as out_file:
                                 out_file.write(response.read())
-                    except Exception as e:
+                    except Exception:
                         model_name = None
 
             #print(model_name)
@@ -4630,10 +4635,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                         primary_stem = INST_STEM if model_params['target_name'] == OTHER_STEM.lower() else stem
                 
         except Exception as e:
-            error_name = f'{type(e).__name__}'
-            traceback_text = ''.join(traceback.format_tb(e.__traceback__))
-            message = f'{error_name}: "{e}"\n{traceback_text}"'
-            #self.error_log_var.set(message)
             is_compatible_model = False
             if is_ckpt:
                 self.pop_up_mdx_c_param(mdx_model_hash)
@@ -7183,7 +7184,7 @@ def read_bulliten_text_mac(path, data):
         if os.path.isfile(path):
             with open(path, 'r') as file :
                 data = file.read().replace("~", "•")
-    except Exception as e:
+    except Exception:
         data = 'No information available.'
 
     return data

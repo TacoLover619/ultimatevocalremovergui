@@ -16,13 +16,10 @@ import functools
 import hashlib
 import inspect
 import io
-import os
 import random
 import socket
-import tempfile
 import warnings
 import zlib
-import tkinter as tk
 
 from diffq import UniformQuantizer, DiffQuantizer
 import torch as th
@@ -99,30 +96,6 @@ def EMA(beta: float = 1):
         return {key: tot / fix[key] for key, tot in total.items()}
     return _update
 
-
-def sizeof_fmt(num: float, suffix: str = 'B'):
-    """
-    Given `num` bytes, return human readable size.
-    Taken from https://stackoverflow.com/a/1094933
-    """
-    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
-        if abs(num) < 1024.0:
-            return "%3.1f%s%s" % (num, unit, suffix)
-        num /= 1024.0
-    return "%.1f%s%s" % (num, 'Yi', suffix)
-
-
-@contextmanager
-def temp_filenames(count: int, delete=True):
-    names = []
-    try:
-        for _ in range(count):
-            names.append(tempfile.NamedTemporaryFile(delete=False).name)
-        yield names
-    finally:
-        if delete:
-            for name in names:
-                os.unlink(name)
 
 def average_metric(metric, count=1.):
     """

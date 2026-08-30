@@ -548,7 +548,7 @@ class CrossTransformerEncoder(nn.Module):
         weight_pos_embed: float = 1.0,
         cape_mean_normalize: bool = True,
         cape_augment: bool = True,
-        cape_glob_loc_scale: list = [5000.0, 1.0, 1.4],
+        cape_glob_loc_scale: tuple = (5000.0, 1.0, 1.4),
         sparse_self_attn: bool = False,
         sparse_cross_attn: bool = False,
         mask_type: str = "diag",

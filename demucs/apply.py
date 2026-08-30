@@ -10,13 +10,11 @@ inteprolation between chunks, as well as the "shift trick".
 from concurrent.futures import ThreadPoolExecutor
 import random
 import typing as tp
-from multiprocessing import Process,Queue,Pipe
 
 import torch as th
 from torch import nn
 from torch.nn import functional as F
 import tqdm
-import tkinter as tk
 
 from .demucs import Demucs
 from .hdemucs import HDemucs
@@ -292,7 +290,7 @@ def demucs_segments(demucs_segment, demucs_model):
             else:
                 if segment is not None:
                     sub.segment = segment
-        except:
+        except Exception:
             segment = None
             if isinstance(demucs_model, BagOfModels):
                 if segment is not None:

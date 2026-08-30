@@ -281,7 +281,7 @@ def wave_to_spectrogram(wave, hop_length, n_fft, mp, band, is_v51_model=False):
 
     return spec
 
-def spectrogram_to_wave(spec, hop_length=1024, mp={}, band=0, is_v51_model=True):
+def spectrogram_to_wave(spec, hop_length=1024, mp=None, band=0, is_v51_model=True):
     spec_left = np.asfortranarray(spec[0])
     spec_right = np.asfortranarray(spec[1])
     
@@ -676,7 +676,7 @@ def adjust_leading_silence(target_audio, reference_audio, silence_threshold=0.01
         target_silence_end_p = (target_silence_end / 44100) * 1000
         silence_difference_p = ref_silence_end_p - target_silence_end_p
         print("silence_difference: ", silence_difference_p)
-    except Exception as e:
+    except Exception:
         pass
 
     if silence_difference > 0:  # Add silence to target_audio
@@ -972,9 +972,7 @@ def align_audio(file1,
         else:
             index = sr1*sec_seg  # 1 second in, assuming sr1 = sr2 = 44100
             samp1, samp2 = wav1[index : index + sr1, 0], wav2[index : index + sr1, 0]
-            samp1_r, samp2_r = wav1[index : index + sr1, 1], wav2[index : index + sr1, 1]
-            diff, diff_r = get_diff(samp1, samp2), get_diff(samp1_r, samp2_r)
-            #print(f"Estimated difference Left Channel: {diff}\nEstimated difference Right Channel: {diff_r}\n")
+            diff = get_diff(samp1, samp2)
         
         # make aligned track 2
         if diff > 0:

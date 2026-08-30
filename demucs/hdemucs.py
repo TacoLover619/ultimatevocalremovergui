@@ -64,7 +64,7 @@ class ScaledEmbedding(nn.Module):
 
 class HEncLayer(nn.Module):
     def __init__(self, chin, chout, kernel_size=8, stride=4, norm_groups=1, empty=False,
-                 freq=True, dconv=True, norm=True, context=0, dconv_kw={}, pad=True,
+                 freq=True, dconv=True, norm=True, context=0, dconv_kw=None, pad=True,
                  rewrite=True):
         """Encoder layer. This used both by the time and the frequency branch.
 
@@ -114,6 +114,7 @@ class HEncLayer(nn.Module):
 
         self.dconv = None
         if dconv:
+            dconv_kw = {} if dconv_kw is None else dconv_kw
             self.dconv = DConv(chout, **dconv_kw)
 
     def forward(self, x, inject=None):
@@ -251,7 +252,7 @@ class MultiWrap(nn.Module):
 
 class HDecLayer(nn.Module):
     def __init__(self, chin, chout, last=False, kernel_size=8, stride=4, norm_groups=1, empty=False,
-                 freq=True, dconv=True, norm=True, context=1, dconv_kw={}, pad=True,
+                 freq=True, dconv=True, norm=True, context=1, dconv_kw=None, pad=True,
                  context_freq=True, rewrite=True):
         """
         Same as HEncLayer but for decoder. See `HEncLayer` for documentation.
@@ -295,6 +296,7 @@ class HDecLayer(nn.Module):
 
         self.dconv = None
         if dconv:
+            dconv_kw = {} if dconv_kw is None else dconv_kw
             self.dconv = DConv(chin, **dconv_kw)
 
     def forward(self, x, skip, length):

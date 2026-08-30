@@ -67,7 +67,7 @@ try:
         determined_size = SCREEN_SIZE_VALUES["small"]
     else:
         determined_size = SCREEN_SIZE_VALUES["medium"]
-except:
+except Exception:
         determined_size = SCREEN_SIZE_VALUES["normal"]
 
 image_scale_1, image_scale_2 = 20, 30

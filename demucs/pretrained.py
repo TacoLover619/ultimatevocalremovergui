@@ -27,7 +27,7 @@ REMOTE_ROOT = Path(__file__).parent / 'remote'
 SOURCES = ["drums", "bass", "other", "vocals"]
 
 
-def demucs_unittest():
+def hdemucs_unittest():
     model = HDemucs(channels=4, sources=SOURCES)
     return model
 
@@ -62,7 +62,7 @@ def get_model(name: str,
     from the remote AWS model repo or the specified local repo if `repo` is not None.
     """
     if name == 'demucs_unittest':
-        return demucs_unittest()
+        return hdemucs_unittest()
     model_repo: ModelOnlyRepo
     if repo is None:
         models = _parse_remote_files(REMOTE_ROOT / 'files.txt')
