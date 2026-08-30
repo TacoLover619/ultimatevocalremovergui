@@ -6,13 +6,11 @@ import time
 import torch
 import audioread
 import gui_data.sv_ttk
-import hashlib
 import json
 import librosa
 import math
 import natsort
 import os
-import pickle
 import psutil
 from pyglet import font as pyglet_font
 import pyperclip
@@ -40,6 +38,8 @@ from gui_data.constants import *
 from gui_data.app_size_values import *
 from gui_data.error_handling import error_text, error_dialouge
 from gui_data.old_data_check import file_check, remove_unneeded_yamls, remove_temps
+from gui_data.model_hash import hash_model_file
+from gui_data.settings_store import load_settings, save_settings
 from gui_data.update_checker import get_latest_release, update_available
 from gui_data.tkinterdnd2 import TkinterDnD, DND_FILES
 from lib_v5.vr_network.model_param_init import ModelParameters
@@ -155,35 +155,10 @@ def close_process(q:queue.Queue):
     thread.start()
 
 def save_data(data):
-    """
-    Saves given data as a .pkl (pickle) file
-
-    Paramters:
-        data(dict):
-            Dictionary containing all the necessary data to save
-    """
-    # Open data file, create it if it does not exist
-    with open('data.pkl', 'wb') as data_file:
-        pickle.dump(data, data_file)
+    save_settings('data.pkl', data)
 
 def load_data() -> dict:
-    """
-    Loads saved pkl file and returns the stored data
-
-    Returns(dict):
-        Dictionary containing all the saved data
-    """
-    try:
-        with open('data.pkl', 'rb') as data_file:  # Open data file
-            data = pickle.load(data_file)
-
-        return data
-    except (ValueError, FileNotFoundError):
-        # Data File is corrupted or not found so recreate it
-
-        save_data(data=DEFAULT_DATA)
-
-        return load_data()
+    return load_settings('data.pkl', DEFAULT_DATA)
 
 def load_model_hash_data(dictionary):
     '''Get the model hash dictionary'''
@@ -722,19 +697,10 @@ class ModelData:
         if not os.path.isfile(self.model_path):
             self.model_status = False
         else:
-            if model_hash_table:
-                for (key, value) in model_hash_table.items():
-                    if self.model_path == key:
-                        self.model_hash = value
-                        break
+            self.model_hash = model_hash_table.get(self.model_path)
                     
             if not self.model_hash:
-                try:
-                    with open(self.model_path, 'rb') as f:
-                        f.seek(- 10000 * 1024, 2)
-                        self.model_hash = hashlib.md5(f.read()).hexdigest()
-                except Exception:
-                    self.model_hash = hashlib.md5(open(self.model_path,'rb').read()).hexdigest()
+                self.model_hash = hash_model_file(self.model_path)
                     
                 table_entry = {self.model_path: self.model_hash}
                 model_hash_table.update(table_entry)
@@ -5988,18 +5954,21 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         saved_ensemble_path = os.path.join(ENSEMBLE_CACHE_DIR, f'{saved_ensemble}.json')
 
         if os.path.isfile(saved_ensemble_path):
-            saved_data = json.load(open(saved_ensemble_path))
+            with open(saved_ensemble_path, encoding='utf-8') as ensemble_file:
+                saved_data = json.load(ensemble_file)
             
         if saved_data:
             self.selection_action_ensemble_stems(saved_data['ensemble_main_stem'], from_menu=False)
             self.ensemble_main_stem_var.set(saved_data['ensemble_main_stem'])
             self.ensemble_type_var.set(saved_data['ensemble_type'])
-            self.saved_model_list = saved_data['selected_models']
-        
-            for saved_model in self.saved_model_list:         
-                status = self.assemble_model_data(saved_model, ENSEMBLE_CHECK)[0].model_status
-                if not status:
-                    self.saved_model_list.remove(saved_model)
+            self.saved_model_list = [
+                saved_model
+                for saved_model in saved_data['selected_models']
+                if self.assemble_model_data(
+                    saved_model,
+                    ENSEMBLE_CHECK,
+                )[0].model_status
+            ]
             
             indexes = self.ensemble_listbox_get_indexes_for_files(self.model_stems_list, self.saved_model_list)
             

@@ -10,16 +10,19 @@ import torch
 from __version__ import VERSION
 from demucs.pretrained import get_model
 from demucs.repo import ModelLoadingError
+from gui_data.constants import DEMUCS_ARCH_TYPE, MDX_ARCH_TYPE, VR_ARCH_TYPE
 from lib_v5 import spec_utils
 from lib_v5.tfc_tdf_v3 import STFT
 from separate import (
     backend_output_to_tensor,
+    create_separator,
     convert_onnx_model,
     load_mdx_checkpoint,
     load_vr_denoiser_model,
     output_path_for_format,
     prepare_mix,
     select_onnx_providers,
+    save_format,
     vr_denoiser,
 )
 
@@ -361,6 +364,62 @@ class CoreCompatibilityTests(unittest.TestCase):
 
         self.assertEqual(mp3_path, str(Path('folder.wav') / 'Track.mp3'))
         self.assertEqual(flac_path, str(Path('folder.wav') / 'Track.flac'))
+
+    def test_separator_factory_rejects_unknown_process_methods(self):
+        model_data = type('ModelData', (), {
+            'process_method': 'Unknown Architecture',
+            'is_mdx_c': False,
+        })()
+
+        with self.assertRaisesRegex(ValueError, 'Unsupported process method'):
+            create_separator(model_data, {})
+
+    def test_separator_factory_selects_each_runtime(self):
+        cases = (
+            (VR_ARCH_TYPE, False, 'SeperateVR'),
+            (MDX_ARCH_TYPE, False, 'SeperateMDX'),
+            (MDX_ARCH_TYPE, True, 'SeperateMDXC'),
+            (DEMUCS_ARCH_TYPE, False, 'SeperateDemucs'),
+        )
+        for process_method, is_mdx_c, class_name in cases:
+            with self.subTest(class_name=class_name):
+                model_data = type('ModelData', (), {
+                    'process_method': process_method,
+                    'is_mdx_c': is_mdx_c,
+                })()
+                with patch(f'separate.{class_name}') as separator_class:
+                    process_data = {'test': True}
+                    created = create_separator(
+                        model_data,
+                        process_data,
+                        main_process_method='main',
+                    )
+
+                separator_class.assert_called_once_with(
+                    model_data,
+                    process_data,
+                    main_process_method='main',
+                )
+                self.assertIs(created, separator_class.return_value)
+
+    @patch('separate.os.remove')
+    @patch('separate.pydub.AudioSegment.from_wav')
+    def test_save_format_exports_before_removing_wav(self, from_wav, remove):
+        converted = save_format('track.wav', 'FLAC', '320k')
+
+        from_wav.return_value.export.assert_called_once_with(
+            'track.flac',
+            format='flac',
+        )
+        remove.assert_called_once_with('track.wav')
+        self.assertEqual(converted, 'track.flac')
+
+    @patch('separate.os.remove')
+    def test_save_format_does_not_remove_wav_for_invalid_format(self, remove):
+        with self.assertRaisesRegex(ValueError, 'Unsupported output format'):
+            save_format('track.wav', 'AAC', '320k')
+
+        remove.assert_not_called()
 
     @patch('separate.rerun_mp3')
     @patch('separate.librosa.load')

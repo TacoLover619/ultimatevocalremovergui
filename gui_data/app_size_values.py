@@ -126,7 +126,8 @@ class ImagePath:
         Returns(ImageTk.PhotoImage):
             Image of path
         """
-        img = Image.open(path).convert(mode='RGBA')
+        with Image.open(path) as source_image:
+            img = source_image.convert(mode='RGBA')
         ratio = img.height/img.width
         img = img.rotate(angle=-rotate)
         if size is not None:

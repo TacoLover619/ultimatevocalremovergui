@@ -1318,7 +1318,21 @@ class SeperateVR(SeperateAttributes):
             
         return wav
 
-def process_secondary_model(secondary_model: ModelData, 
+def create_separator(model_data: ModelData, process_data, **kwargs):
+    """Create the separator for a model without duplicating dispatch logic."""
+    if model_data.process_method == VR_ARCH_TYPE:
+        separator_class = SeperateVR
+    elif model_data.process_method == MDX_ARCH_TYPE:
+        separator_class = SeperateMDXC if model_data.is_mdx_c else SeperateMDX
+    elif model_data.process_method == DEMUCS_ARCH_TYPE:
+        separator_class = SeperateDemucs
+    else:
+        raise ValueError(f'Unsupported process method: {model_data.process_method!r}')
+
+    return separator_class(model_data, process_data, **kwargs)
+
+
+def process_secondary_model(secondary_model: ModelData,
                             process_data, 
                             main_model_primary_stem_4_stem=None, 
                             is_source_load=False, 
@@ -1331,17 +1345,15 @@ def process_secondary_model(secondary_model: ModelData,
         process_iteration = process_data['process_iteration']
         process_iteration()
     
-    if secondary_model.process_method == VR_ARCH_TYPE:
-        seperator = SeperateVR(secondary_model, process_data, main_model_primary_stem_4_stem=main_model_primary_stem_4_stem, main_process_method=main_process_method, main_model_primary=main_model_primary)
-    if secondary_model.process_method == MDX_ARCH_TYPE:
-        if secondary_model.is_mdx_c:
-            seperator = SeperateMDXC(secondary_model, process_data, main_model_primary_stem_4_stem=main_model_primary_stem_4_stem, main_process_method=main_process_method, is_return_dual=is_return_dual, main_model_primary=main_model_primary)
-        else:
-            seperator = SeperateMDX(secondary_model, process_data, main_model_primary_stem_4_stem=main_model_primary_stem_4_stem, main_process_method=main_process_method, main_model_primary=main_model_primary)
-    if secondary_model.process_method == DEMUCS_ARCH_TYPE:
-        seperator = SeperateDemucs(secondary_model, process_data, main_model_primary_stem_4_stem=main_model_primary_stem_4_stem, main_process_method=main_process_method, is_return_dual=is_return_dual, main_model_primary=main_model_primary)
-        
-    secondary_sources = seperator.seperate()
+    separator = create_separator(
+        secondary_model,
+        process_data,
+        main_model_primary_stem_4_stem=main_model_primary_stem_4_stem,
+        main_process_method=main_process_method,
+        is_return_dual=is_return_dual,
+        main_model_primary=main_model_primary,
+    )
+    secondary_sources = separator.seperate()
 
     if type(secondary_sources) is dict and not is_source_load and not is_pre_proc_model:
         return gather_sources(secondary_model.primary_model_primary_stem, secondary_stem(secondary_model.primary_model_primary_stem), secondary_sources)
@@ -1364,17 +1376,14 @@ def process_chain_model(secondary_model: ModelData,
     
     vocal_stem_path = [vocal_source, os.path.splitext(os.path.basename(vocal_stem_path))[0]]
 
-    if secondary_model.process_method == VR_ARCH_TYPE:
-        seperator = SeperateVR(secondary_model, process_data, vocal_stem_path=vocal_stem_path, master_inst_source=master_inst_source, master_vocal_source=master_vocal_source)
-    if secondary_model.process_method == MDX_ARCH_TYPE:
-        if secondary_model.is_mdx_c:
-            seperator = SeperateMDXC(secondary_model, process_data, vocal_stem_path=vocal_stem_path, master_inst_source=master_inst_source, master_vocal_source=master_vocal_source)
-        else:
-            seperator = SeperateMDX(secondary_model, process_data, vocal_stem_path=vocal_stem_path, master_inst_source=master_inst_source, master_vocal_source=master_vocal_source)
-    if secondary_model.process_method == DEMUCS_ARCH_TYPE:
-        seperator = SeperateDemucs(secondary_model, process_data, vocal_stem_path=vocal_stem_path, master_inst_source=master_inst_source, master_vocal_source=master_vocal_source)
-        
-    secondary_sources = seperator.seperate()
+    separator = create_separator(
+        secondary_model,
+        process_data,
+        vocal_stem_path=vocal_stem_path,
+        master_inst_source=master_inst_source,
+        master_vocal_source=master_vocal_source,
+    )
+    secondary_sources = separator.seperate()
     
     if type(secondary_sources) is dict:
         return secondary_sources
@@ -1444,32 +1453,30 @@ def output_path_for_format(audio_path, output_format):
     return f'{path_without_extension}.{output_format.lower()}'
 
 
-def save_format(audio_path, save_format, mp3_bit_set):
+def save_format(audio_path, output_format, mp3_bit_set):
+    if output_format == WAV:
+        return audio_path
+    if output_format not in (FLAC, MP3):
+        raise ValueError(f'Unsupported output format: {output_format!r}')
 
-    if not save_format == WAV:
+    if OPERATING_SYSTEM == 'Darwin':
+        ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
+        pydub.AudioSegment.converter = ffmpeg_path
 
-        if OPERATING_SYSTEM == 'Darwin':
-            FFMPEG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
-            pydub.AudioSegment.converter = FFMPEG_PATH
+    audio = pydub.AudioSegment.from_wav(audio_path)
+    converted_path = output_path_for_format(audio_path, output_format)
 
-        musfile = pydub.AudioSegment.from_wav(audio_path)
-
-        if save_format == FLAC:
-            audio_path_flac = output_path_for_format(audio_path, FLAC)
-            musfile.export(audio_path_flac, format="flac")
-
-        if save_format == MP3:
-            audio_path_mp3 = output_path_for_format(audio_path, MP3)
-            try:
-                musfile.export(audio_path_mp3, format="mp3", bitrate=mp3_bit_set, codec="libmp3lame")
-            except Exception as e:
-                print(e)
-                musfile.export(audio_path_mp3, format="mp3", bitrate=mp3_bit_set)
-        
+    if output_format == FLAC:
+        audio.export(converted_path, format='flac')
+    else:
         try:
-            os.remove(audio_path)
-        except Exception as e:
-            print(e)
+            audio.export(converted_path, format='mp3', bitrate=mp3_bit_set, codec='libmp3lame')
+        except Exception as error:
+            print(error)
+            audio.export(converted_path, format='mp3', bitrate=mp3_bit_set)
+
+    os.remove(audio_path)
+    return converted_path
             
 def pitch_shift(mix):
     new_sr = 31183
