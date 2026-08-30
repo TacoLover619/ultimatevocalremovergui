@@ -20,6 +20,7 @@ from separate import (
     load_mdx_checkpoint,
     load_vr_denoiser_model,
     output_path_for_format,
+    pad_audio_boundaries,
     prepare_mix,
     select_onnx_providers,
     save_format,
@@ -28,6 +29,21 @@ from separate import (
 
 
 class CoreCompatibilityTests(unittest.TestCase):
+
+    def test_audio_boundary_padding_uses_real_clip_context(self):
+        mix = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        padded = pad_audio_boundaries(mix, 2, 2)
+
+        np.testing.assert_array_equal(
+            padded,
+            np.array(
+                [[3.0, 2.0, 1.0, 2.0, 3.0, 2.0, 1.0],
+                 [6.0, 5.0, 4.0, 5.0, 6.0, 5.0, 4.0]],
+                dtype=np.float32,
+            ),
+        )
+
     @staticmethod
     def _top_level_imports(path):
         imports = []

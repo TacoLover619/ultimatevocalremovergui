@@ -75,6 +75,14 @@ def clear_gpu_cache():
     else:
         torch.cuda.empty_cache()
 
+
+def pad_audio_boundaries(mix, left, right):
+    """Pad audio with mirrored context so inference does not fade clip edges."""
+    if left < 0 or right < 0:
+        raise ValueError('Audio padding cannot be negative')
+    mode = 'reflect' if mix.shape[-1] > 1 else 'edge'
+    return np.pad(mix, ((0, 0), (left, right)), mode=mode)
+
 warnings.filterwarnings("ignore")
 cpu = torch.device('cpu')
 
@@ -667,7 +675,7 @@ class SeperateMDX(SeperateAttributes):
         gen_size = chunk_size-2*self.trim
 
         pad = gen_size + self.trim - ((mix.shape[-1]) % gen_size)
-        mixture = np.concatenate((np.zeros((2, self.trim), dtype='float32'), mix, np.zeros((2, pad), dtype='float32')), 1)
+        mixture = pad_audio_boundaries(mix, self.trim, pad)
 
         step = self.chunk_size - self.n_fft if overlap == DEFAULT else int((1 - overlap) * chunk_size)
         result = np.zeros((1, 2, mixture.shape[-1]), dtype=np.float32)
@@ -867,7 +875,10 @@ class SeperateMDXC(SeperateAttributes):
         hop_size = chunk_size // overlap
         mix_shape = mix.shape[1]
         pad_size = hop_size - (mix_shape - chunk_size) % hop_size
-        mix = torch.cat([torch.zeros(2, chunk_size - hop_size), mix, torch.zeros(2, pad_size + chunk_size - hop_size)], 1)
+        left_pad = chunk_size - hop_size
+        right_pad = pad_size + chunk_size - hop_size
+        padded_mix = pad_audio_boundaries(mix.numpy(), left_pad, right_pad)
+        mix = torch.from_numpy(padded_mix)
 
         chunks = mix.unfold(1, chunk_size, hop_size).transpose(0, 1)
         batches = [chunks[i : i + batch_size] for i in range(0, len(chunks), batch_size)]
