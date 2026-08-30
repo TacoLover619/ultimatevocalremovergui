@@ -204,6 +204,31 @@ class CoreCompatibilityTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'one.*two'):
                     prepare_mix(audio)
 
+    @patch('separate.librosa.load')
+    def test_prepare_mix_rejects_multichannel_decoded_files(self, librosa_load):
+        librosa_load.return_value = (np.ones((3, 100), dtype=np.float32), 44_100)
+
+        with self.assertRaisesRegex(ValueError, 'one or two channels'):
+            prepare_mix('multichannel.wav')
+
+    def test_prepare_mix_rejects_empty_audio(self):
+        for audio in (
+            np.array([], dtype=np.float32),
+            np.empty((2, 0), dtype=np.float32),
+        ):
+            with self.subTest(shape=audio.shape):
+                with self.assertRaisesRegex(ValueError, 'at least one sample'):
+                    prepare_mix(audio)
+
+    def test_prepare_mix_rejects_non_finite_audio(self):
+        for invalid_value in (np.nan, np.inf, -np.inf):
+            audio = np.ones((2, 100), dtype=np.float32)
+            audio[0, 10] = invalid_value
+
+            with self.subTest(invalid_value=invalid_value):
+                with self.assertRaisesRegex(ValueError, 'non-finite'):
+                    prepare_mix(audio)
+
     def test_output_conversion_replaces_only_the_final_suffix(self):
         audio_path = str(Path('folder.wav') / 'Track.WAV')
 
