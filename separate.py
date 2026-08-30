@@ -805,7 +805,7 @@ class SeperateMDXC(SeperateAttributes):
 
         try:
             S = model.num_target_instruments
-        except Exception as e:
+        except Exception:
             S = model.module.num_target_instruments
 
         mdx_segment_size = self.mdx_c_configs.inference.dim_t if self.is_mdx_c_seg_def else self.mdx_segment_size
@@ -1387,7 +1387,7 @@ def prepare_mix(mix):
     is_array_input = isinstance(mix, np.ndarray)
 
     if not is_array_input:
-        mix, sr = librosa.load(mix, mono=False, sr=44100)
+        mix, _ = librosa.load(mix, mono=False, sr=44100)
 
     if isinstance(audio_path, str):
         if not np.any(mix) and audio_path.lower().endswith('.mp3'):
