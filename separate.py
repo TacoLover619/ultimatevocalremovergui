@@ -105,6 +105,17 @@ def load_mdx_checkpoint(model_path, device):
     model.load_state_dict(state_dict)
     return model_params, model.to(device).eval()
 
+
+def normalize_spectrogram(magnitude):
+    peak = magnitude.max()
+    if peak > 0:
+        magnitude /= peak
+    return magnitude
+
+
+def backend_output_to_tensor(output, device):
+    return torch.as_tensor(output, device=device)
+
 class SeperateAttributes:
     def __init__(self, model_data: ModelData, 
                  process_data: dict, 
@@ -675,7 +686,9 @@ class SeperateMDX(SeperateAttributes):
         else:
             spec_pred = -self.model_run(-spek)*0.5+self.model_run(spek)*0.5 if self.is_denoise else self.model_run(spek)
 
-        return self.stft.inverse(torch.tensor(spec_pred).to(self.device)).cpu().detach().numpy()
+        return self.stft.inverse(
+            backend_output_to_tensor(spec_pred, self.device)
+        ).cpu().detach().numpy()
 
 class SeperateMDXC(SeperateAttributes):        
 
@@ -1235,14 +1248,14 @@ class SeperateVR(SeperateAttributes):
         n_frame = X_mag.shape[2]
         pad_l, pad_r, roi_size = spec_utils.make_padding(n_frame, self.window_size, self.model_run.offset)
         X_mag_pad = np.pad(X_mag, ((0, 0), (0, 0), (pad_l, pad_r)), mode='constant')
-        X_mag_pad /= X_mag_pad.max()
+        normalize_spectrogram(X_mag_pad)
         mask = _execute(X_mag_pad, roi_size)
         
         if self.is_tta:
             pad_l += roi_size // 2
             pad_r += roi_size // 2
             X_mag_pad = np.pad(X_mag, ((0, 0), (0, 0), (pad_l, pad_r)), mode='constant')
-            X_mag_pad /= X_mag_pad.max()
+            normalize_spectrogram(X_mag_pad)
             mask_tta = _execute(X_mag_pad, roi_size)
             mask_tta = mask_tta[:, :, roi_size // 2:]
             mask = (mask[:, :, :n_frame] + mask_tta[:, :, :n_frame]) * 0.5
@@ -1431,7 +1444,7 @@ def vr_denoiser(X, device, hop_length=1024, n_fft=2048, cropsize=256, is_deverbe
     n_frame = X_mag.shape[2]
     pad_l, pad_r, roi_size = spec_utils.make_padding(n_frame, cropsize, model.offset)
     X_mag_pad = np.pad(X_mag, ((0, 0), (0, 0), (pad_l, pad_r)), mode='constant')
-    X_mag_pad /= X_mag_pad.max()
+    normalize_spectrogram(X_mag_pad)
 
     X_dataset = []
     patches = (X_mag_pad.shape[2] - 2 * model.offset) // roi_size

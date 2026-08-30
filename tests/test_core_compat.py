@@ -1,14 +1,17 @@
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
 import numpy as np
 import torch
 
 from __version__ import VERSION
+from demucs.pretrained import get_model
+from demucs.repo import ModelLoadingError
 from lib_v5 import spec_utils
 from lib_v5.tfc_tdf_v3 import STFT
-from separate import load_mdx_checkpoint, vr_denoiser
+from separate import backend_output_to_tensor, load_mdx_checkpoint, vr_denoiser
 
 
 class CoreCompatibilityTests(unittest.TestCase):
@@ -22,6 +25,20 @@ class CoreCompatibilityTests(unittest.TestCase):
         self.assertIn('AppId={{652AA21C-E084-435C-8ED9-4A29AC2731F1}', definition)
         self.assertIn('Name: "{app}\\UVR.exe"', definition)
         self.assertIn('Name: "{app}\\UVR_Launcher.exe"', definition)
+
+    def test_windows_builder_validates_every_bundled_binary(self):
+        builder = Path(__file__).resolve().parents[1] / 'build_windows.ps1'
+        definition = builder.read_text(encoding='utf-8')
+        self.assertIn("$SndFileLibrary = Join-Path $BinaryDirectory 'sndfile.dll'", definition)
+        self.assertIn('$RequiredBinaries = @(', definition)
+        self.assertIn('Required bundled binary is missing:', definition)
+
+    def test_missing_demucs_repository_reports_model_loading_error(self):
+        with TemporaryDirectory() as directory:
+            missing_repository = Path(directory) / 'missing-models'
+
+            with self.assertRaisesRegex(ModelLoadingError, 'must exist'):
+                get_model('missing-model', repo=missing_repository)
 
     def test_stft_round_trip_is_finite(self):
         audio = torch.randn(1, 2, 44_100)
@@ -106,6 +123,29 @@ class CoreCompatibilityTests(unittest.TestCase):
 
         self.assertEqual(output.shape, audio.shape)
         self.assertTrue(np.isfinite(output).all())
+
+    def test_vr_denoiser_preserves_finite_silence(self):
+        audio = np.zeros((2, 44_100), dtype=np.float32)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        output = vr_denoiser(
+            audio,
+            device,
+            model_path='models/VR_Models/UVR-DeNoise-Lite.pth',
+        )
+
+        self.assertEqual(output.shape, audio.shape)
+        self.assertTrue(np.isfinite(output).all())
+        self.assertTrue(np.allclose(output, 0))
+
+    def test_mdx_tensor_output_is_not_copied_through_cpu(self):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        output = torch.ones((1, 2, 4, 4), device=device)
+
+        converted = backend_output_to_tensor(output, device)
+
+        self.assertEqual(converted.device, output.device)
+        self.assertEqual(converted.data_ptr(), output.data_ptr())
 
 
 if __name__ == '__main__':
