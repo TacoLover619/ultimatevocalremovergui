@@ -807,7 +807,7 @@ class Ensembler:
         is_mv_sep = True
         
         if is_bulk:
-            number_list = list(set([os.path.basename(i).split("_")[0] for i in audio_inputs]))
+            number_list = list({os.path.basename(i).split("_")[0] for i in audio_inputs})
             for n in number_list:
                 current_list = [i for i in audio_inputs if os.path.basename(i).startswith(n)]
                 audio_file_base = os.path.basename(current_list[0]).split('.wav')[0]
@@ -1216,7 +1216,7 @@ class ComboBoxMenu(ttk.Combobox):
             max_string = max(option_list, key=len)
             font = Font(font=self.cget('font'))
             width_in_pixels = font.measure(max_string) - offset
-            width_in_pixels = 0 if width_in_pixels < 0 else width_in_pixels
+            width_in_pixels = max(width_in_pixels, 0)
         else:
             width_in_pixels = 0
         
@@ -2327,9 +2327,10 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         result = []
 
         for model in stem_check:
-            if is_multi_stem:
-                result.append(model.model_and_process_tag)
-            elif is_4_stem_check and (model.demucs_stem_count == 4 or model.mdx_stem_count == 4):
+            if is_multi_stem or (
+                is_4_stem_check
+                and (model.demucs_stem_count == 4 or model.mdx_stem_count == 4)
+            ):
                 result.append(model.model_and_process_tag)
             elif matches_stem(model) or (not is_no_demucs and primary_stem.lower() in model.demucs_source_list):
                 if is_check_vocal_split:
@@ -4312,10 +4313,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             tooltip.showtip(INVALID_INPUT_E, True)
         
         def validation(value):
-            if re.fullmatch(modified_pattern, value) is None:
-                return False
-            else:
-                return True
+            return re.fullmatch(modified_pattern, value) is not None
         
         if not pattern:
             pattern = r'^[a-zA-Z0-9 -]{0,25}$'
@@ -5328,8 +5326,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                         
             self.download_demucs_models_list = list(dict.fromkeys(self.download_demucs_models_list)) 
         
-            for option_name in self.download_demucs_models_list:
-                model_download_demucs_list.append(option_name)
+            model_download_demucs_list.extend(self.download_demucs_models_list)
             
             configure_combobox(self.model_download_demucs_Option, model_download_demucs_list, self.model_download_demucs_var, DEMUCS_ARCH_TYPE, model_download_demucs_name)
 

@@ -463,7 +463,7 @@ class HTDemucs(nn.Module):
         # If `cac` is True, `m` is actually a full spectrogram and `z` is ignored.
         niters = self.wiener_iters
         if self.cac:
-            B, S, C, Fr, T = m.shape
+            B, S, _C, Fr, T = m.shape
             out = m.view(B, S, -1, 2, Fr, T).permute(0, 1, 2, 4, 5, 3)
             out = torch.view_as_complex(out.contiguous())
             return out
@@ -537,7 +537,7 @@ class HTDemucs(nn.Module):
         mag = self._magnitude(z).to(mix.device)
         x = mag
 
-        B, C, Fq, T = x.shape
+        B, _C, Fq, T = x.shape
 
         # unlike previous Demucs, we always normalize because it is easier.
         mean = x.mean(dim=(1, 2, 3), keepdim=True)
@@ -582,7 +582,7 @@ class HTDemucs(nn.Module):
             saved.append(x)
         if self.crosstransformer:
             if self.bottom_channels:
-                b, c, f, t = x.shape
+                _b, _c, f, _t = x.shape
                 x = rearrange(x, "b c f t-> b c (f t)")
                 x = self.channel_upsampler(x)
                 x = rearrange(x, "b c (f t)-> b c f t", f=f)

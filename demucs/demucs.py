@@ -192,7 +192,7 @@ class LocalState(nn.Module):
         self.proj = nn.Conv1d(channels + heads * nfreqs, channels, 1)
 
     def forward(self, x):
-        B, C, T = x.shape
+        B, _C, T = x.shape
         heads = self.heads
         indexes = torch.arange(T, device=x.device, dtype=x.dtype)
         # left index are keys, right index are queries

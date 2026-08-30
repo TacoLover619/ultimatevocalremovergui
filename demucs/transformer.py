@@ -343,7 +343,7 @@ class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
         """
         device = src.device
         x = src
-        T, B, C = x.shape
+        T, _B, _C = x.shape
         if self.sparse and not self.auto_sparsity:
             assert src_mask is None
             src_mask = self.src_mask
@@ -472,8 +472,8 @@ class CrossTransformerEncoderLayer(nn.Module):
 
         """
         device = q.device
-        T, B, C = q.shape
-        S, B, C = k.shape
+        T, _, _ = q.shape
+        S, _B, _C = k.shape
         if self.sparse and not self.auto_sparsity:
             assert mask is None
             mask = self.mask

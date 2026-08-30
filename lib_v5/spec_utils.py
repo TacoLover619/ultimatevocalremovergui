@@ -923,9 +923,9 @@ def align_audio(file1,
 
     if file2.endswith(".mp3") and is_macos:
         length2 = rerun_mp3(file2)
-        wav2, sr2 = librosa.load(file2, duration=length2, sr=44100, mono=False)
+        wav2, _ = librosa.load(file2, duration=length2, sr=44100, mono=False)
     else:
-        wav2, sr2 = librosa.load(file2, sr=44100, mono=False)
+        wav2, _ = librosa.load(file2, sr=44100, mono=False)
 
     if wav1.ndim == 1 and wav2.ndim == 1:
          is_mono = True
@@ -1242,7 +1242,7 @@ def align_audio_test(wav1, wav2, sr1=44100):
     return wav2_aligned
 
 def load_audio(audio_file):
-    wav, sr = librosa.load(audio_file, sr=44100, mono=False)
+    wav, _sr = librosa.load(audio_file, sr=44100, mono=False)
 
     if wav.ndim == 1:
         wav = np.asfortranarray([wav,wav])
