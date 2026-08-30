@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -12,6 +13,14 @@ from separate import vr_denoiser
 class CoreCompatibilityTests(unittest.TestCase):
     def test_release_version(self):
         self.assertEqual(VERSION, 'v6.0.0')
+
+    def test_windows_installer_upgrades_original_release(self):
+        installer = Path(__file__).resolve().parents[1] / 'UVR-Windows.iss'
+        definition = installer.read_text(encoding='utf-8')
+        self.assertIn('AppVersion={#AppVersion}', definition)
+        self.assertIn('AppId={{652AA21C-E084-435C-8ED9-4A29AC2731F1}', definition)
+        self.assertIn('Name: "{app}\\UVR.exe"', definition)
+        self.assertIn('Name: "{app}\\UVR_Launcher.exe"', definition)
 
     def test_stft_round_trip_is_finite(self):
         audio = torch.randn(1, 2, 44_100)

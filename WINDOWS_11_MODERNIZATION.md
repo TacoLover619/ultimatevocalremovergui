@@ -205,8 +205,8 @@ other large-file hosting after any desired code-signing step.
 The completed build was verified with:
 
 - Python bytecode compilation across the application source.
-- All five core compatibility tests passing, including the release-version
-  assertion.
+- All six core compatibility tests passing, including the release-version and
+  original-installer-upgrade assertions.
 - VR denoising inference on an NVIDIA GeForce RTX 4090 through CUDA.
 - ONNX Runtime session execution with `CUDAExecutionProvider` active and CPU
   fallback also available.

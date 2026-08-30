@@ -25,13 +25,17 @@ is not one of the files attached to this release. The SHA-256 value for the v6.0
 setup EXE is:
 
 ```text
-D0EAA630C68A8BA8F29C3EE5356A5587382FCF2DFB703776C2E0FFBF37B1EB91
+A6393BCE4524F5FBACAFE66777741E2EE2C1F9EF93D52F92D106552268884DEF
 ```
 
 The installer is 64-bit, targets Windows 10 build 17763 or newer (including
 Windows 11), installs per user by default, creates a Start Menu entry, offers an
 optional Desktop shortcut, and registers a normal Windows uninstaller. No
 separate Python installation is required.
+
+The setup package uses the original UVR Windows installer identity. Running it
+over version 5.6.1 upgrades the existing installation and its Installed Apps
+entry instead of registering a separate copy.
 
 ## Runtime modernization
 
@@ -77,9 +81,9 @@ separate Python installation is required.
 
 ## Verification completed
 
-- Five core compatibility tests pass: safe checkpoint loading, modern Librosa
-  resampling, STFT round trip, real VR neural inference, and release-version
-  reporting.
+- Six core compatibility tests pass: safe checkpoint loading, modern Librosa
+  resampling, STFT round trip, real VR neural inference, release-version
+  reporting, and preservation of the original Windows installer upgrade ID.
 - The bundled `UVR-DeNoise-Lite.pth` model completed actual inference with
   finite, shape-correct output.
 - PyTorch CUDA inference was verified on an NVIDIA GeForce RTX 4090.
@@ -91,6 +95,10 @@ separate Python installation is required.
 - The exact split installer artifacts completed an isolated installation; the
   installed GUI remained healthy during a second 20-second startup test; the
   registered uninstaller exited successfully and removed installed binaries.
+- The replacement installer completed a real in-place upgrade of the registered
+  v5.6.1 application. Windows reported v6.0.0 afterward, both legacy launch
+  executables were removed, the Start Menu shortcut targeted the v6 executable,
+  and the installed executable matched the tested build hash.
 
 ## Known limitations
 

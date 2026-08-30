@@ -4,7 +4,9 @@
 #define AppExecutable "Ultimate Vocal Remover.exe"
 
 [Setup]
-AppId={{E8F9DD16-4DD4-467E-925D-589A81EE67E7}
+; Keep the original UVR Windows installer identity so v6 upgrades an existing
+; v5.6.1 installation instead of creating a second Installed Apps entry.
+AppId={{652AA21C-E084-435C-8ED9-4A29AC2731F1}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} v{#AppVersion}
@@ -48,6 +50,13 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 
 [Files]
 Source: "dist\Ultimate Vocal Remover\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+; These are the v5.6.1 entry points. Remove them during an in-place upgrade so
+; an existing Start Menu or Desktop shortcut cannot launch the old application.
+; Model directories, settings, and downloaded user data are left in place.
+Type: files; Name: "{app}\UVR.exe"
+Type: files; Name: "{app}\UVR_Launcher.exe"
 
 [Icons]
 Name: "{group}\Ultimate Vocal Remover"; Filename: "{app}\{#AppExecutable}"; WorkingDir: "{app}"

@@ -271,7 +271,9 @@ stays below GitHub's 2 GiB release asset limit. The setup EXE and every numbered
 The installer targets 64-bit Windows 10 build 17763 or newer, including Windows
 11. It installs per user under `%LOCALAPPDATA%\Programs\Ultimate Vocal Remover`,
 adds a Start Menu shortcut, offers an optional Desktop shortcut, and registers
-a Windows uninstaller.
+a Windows uninstaller. It retains the original UVR Windows installer identity,
+so running v6.0 over an existing v5.6.1 installation performs an in-place
+upgrade and updates the existing Installed Apps entry.
 
 #### Verify the completed build
 
@@ -310,7 +312,7 @@ for developers who already know the full process.
 
 ### Automated core tests
 
-[`tests/test_core_compat.py`](tests/test_core_compat.py) contains five focused
+[`tests/test_core_compat.py`](tests/test_core_compat.py) contains six focused
 tests:
 
 1. Loads the bundled VR model and MDX mixer checkpoint using the modern safe
@@ -321,6 +323,8 @@ tests:
 4. Runs actual neural inference with `UVR-DeNoise-Lite.pth`, then validates that
    the result matches the input shape and contains only finite samples.
 5. Verifies that the packaged application reports the v6.0.0 release version.
+6. Verifies that the Windows installer retains the original UVR installer ID
+   and removes the two legacy v5.6.1 launch executables during an upgrade.
 
 These tests can be run with:
 
@@ -332,7 +336,7 @@ These tests can be run with:
 
 The modernization was verified with more than a GUI import check:
 
-- All five core compatibility tests pass.
+- All six core compatibility tests pass.
 - Python bytecode compilation passes for `UVR.py`, `separate.py`, `demucs/`,
   `lib_v5/`, `gui_data/`, and the tests.
 - The bundled UVR denoising model completes real inference with finite,
@@ -450,7 +454,7 @@ These bundles contain the UVR interface, Python, PyTorch, and other dependencies
   `UVR_v6.0.0_setup.exe`. Its SHA-256 value is:
 
   ```text
-  D0EAA630C68A8BA8F29C3EE5356A5587382FCF2DFB703776C2E0FFBF37B1EB91
+  A6393BCE4524F5FBACAFE66777741E2EE2C1F9EF93D52F92D106552268884DEF
   ```
 
 - The installer window must say `Setup - Ultimate Vocal Remover v6.0.0`. If it
