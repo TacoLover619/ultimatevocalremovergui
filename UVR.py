@@ -39,6 +39,7 @@ from gui_data.app_size_values import *
 from gui_data.error_handling import error_text, error_dialouge
 from gui_data.old_data_check import file_check, remove_unneeded_yamls, remove_temps
 from gui_data.model_hash import hash_model_file
+from gui_data.output_naming import clean_output_base, default_output_directory
 from gui_data.settings_store import load_settings, save_settings
 from gui_data.update_checker import get_latest_release, update_available
 from gui_data.tkinterdnd2 import TkinterDnD, DND_FILES
@@ -1637,11 +1638,11 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.filePaths_Frame = ttk.Frame(master=self)
         self.filePaths_Frame.place(x=FILEPATHS_FRAME_X, y=FILEPATHS_FRAME_Y, width=FILEPATHS_FRAME_WIDTH, height=self.FILEPATHS_HEIGHT, relx=0, rely=0, relwidth=1, relheight=0)
 
-        self.filePaths_musicFile_Button = ttk.Button(master=self.filePaths_Frame, text=SELECT_INPUT_TEXT, command=self.input_select_filedialog)
+        self.filePaths_musicFile_Button = self.main_window_LABEL_SET(self.filePaths_Frame, SELECT_INPUT_TEXT)
         self.filePaths_musicFile_Button.place(x=MUSICFILE_BUTTON_X, y=MUSICFILE_BUTTON_Y, width=MUSICFILE_BUTTON_WIDTH, height=MUSICFILE_BUTTON_HEIGHT, relx=0, rely=0, relwidth=0.3, relheight=0.5)
         self.filePaths_musicFile_Entry = ttk.Entry(master=self.filePaths_Frame, textvariable=self.inputPathsEntry_var, font=self.font_entry, state=tk.DISABLED)
         self.filePaths_musicFile_Entry.place(x=MUSICFILE_ENTRY_X, y=MUSICFILE_BUTTON_Y, width=MUSICFILE_ENTRY_WIDTH, height=MUSICFILE_ENTRY_HEIGHT, relx=0.3, rely=0, relwidth=0.7, relheight=0.5)                                   
-        self.filePaths_musicFile_Open = ttk.Button(master=self.filePaths_Frame, image=self.efile_img, command=lambda:OPEN_FILE_func(os.path.dirname(self.inputPaths[0])) if self.inputPaths and os.path.isdir(os.path.dirname(self.inputPaths[0])) else self.error_dialoge(INVALID_INPUT))
+        self.filePaths_musicFile_Open = ttk.Button(master=self.filePaths_Frame, image=self.efile_img, command=self.input_select_filedialog)
         self.filePaths_musicFile_Open.place(x=OPEN_BUTTON_X, y=MUSICFILE_BUTTON_Y, width=OPEN_BUTTON_WIDTH, height=MUSICFILE_ENTRY_HEIGHT, relx=0.3, rely=0, relwidth=0.7, relheight=0.5)   
 
         # Add any additional configurations or method calls here
@@ -1651,11 +1652,11 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.help_hints(self.filePaths_musicFile_Open, text=INPUT_FOLDER_BUTTON_HELP)     
 
         # Save To Option
-        self.filePaths_saveTo_Button = ttk.Button(master=self.filePaths_Frame, text=SELECT_OUTPUT_TEXT, command=self.export_select_filedialog)
+        self.filePaths_saveTo_Button = self.main_window_LABEL_SET(self.filePaths_Frame, SELECT_OUTPUT_TEXT)
         self.filePaths_saveTo_Button.place(x=SAVETO_BUTTON_X, y=SAVETO_BUTTON_Y, width=SAVETO_BUTTON_WIDTH, height=SAVETO_BUTTON_HEIGHT, relx=0, rely=0.5, relwidth=0.3, relheight=0.5)
         self.filePaths_saveTo_Entry = ttk.Entry(master=self.filePaths_Frame, textvariable=self.export_path_var, font=self.font_entry, state=tk.DISABLED)
         self.filePaths_saveTo_Entry.place(x=SAVETO_ENTRY_X, y=SAVETO_BUTTON_Y, width=SAVETO_ENTRY_WIDTH, height=SAVETO_ENTRY_HEIGHT, relx=0.3, rely=0.5, relwidth=0.7, relheight=0.5)
-        self.filePaths_saveTo_Open = ttk.Button(master=self.filePaths_Frame, image=self.efile_img, command=lambda:OPEN_FILE_func(Path(self.export_path_var.get())) if os.path.isdir(self.export_path_var.get()) else self.error_dialoge(INVALID_EXPORT))
+        self.filePaths_saveTo_Open = ttk.Button(master=self.filePaths_Frame, image=self.efile_img, command=self.export_select_filedialog)
         self.filePaths_saveTo_Open.place(x=OPEN_BUTTON_X, y=SAVETO_BUTTON_Y, width=OPEN_BUTTON_WIDTH, height=SAVETO_ENTRY_HEIGHT, relx=0.3, rely=0.5, relwidth=0.7, relheight=0.5)
         self.help_hints(self.filePaths_saveTo_Button, text=OUTPUT_FOLDER_ENTRY_HELP) 
         self.help_hints(self.filePaths_saveTo_Open, text=OUTPUT_FOLDER_BUTTON_HELP)     
@@ -2153,7 +2154,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
 
         if paths:  # Path selected
             self.inputPaths = paths
-            
+            self.export_path_var.set(default_output_directory(paths))
             self.process_input_selections()
             self.update_inputPaths()
 
@@ -2439,31 +2440,76 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.all_models = self.vr_primary_model_names + self.mdx_primary_model_names + self.demucs_primary_model_names + self.vr_secondary_model_names + self.mdx_secondary_model_names + self.demucs_secondary_model_names + self.demucs_pre_proc_model_name
       
     def verify_audio(self, audio_file, is_process=True, sample_path=None):
-        is_good = False
-        error_data = ''
-        
-        if not type(audio_file) is tuple:
-            audio_file = [audio_file]
+        audio_files = audio_file if isinstance(audio_file, (tuple, list)) else [audio_file]
+        is_good = True
+        errors = []
 
-        for i in audio_file:
-            if os.path.isfile(i):
-                try:
-                    librosa.load(i, duration=3, mono=False, sr=44100) if not type(sample_path) is str else self.create_sample(i, sample_path)
-                    is_good = True
-                except Exception as e:
-                    error_name = f'{type(e).__name__}'
-                    traceback_text = ''.join(traceback.format_tb(e.__traceback__))
-                    message = f'{error_name}: "{e}"\n{traceback_text}"'
-                    if is_process:
-                        audio_base_name = os.path.basename(i)
-                        self.error_log_var.set(f'{ERROR_LOADING_FILE_TEXT[0]}:\n\n\"{audio_base_name}\"\n\n{ERROR_LOADING_FILE_TEXT[1]}:\n\n{message}')
-                    else:
-                        error_data = AUDIO_VERIFICATION_CHECK(i, message)
+        for input_file in audio_files:
+            try:
+                if not os.path.isfile(input_file):
+                    raise FileNotFoundError(f'Input file does not exist: {input_file}')
+                if isinstance(sample_path, str):
+                    self.create_sample(input_file, sample_path)
+                else:
+                    librosa.load(input_file, duration=3, mono=False, sr=44100)
+            except Exception as error:
+                is_good = False
+                error_name = type(error).__name__
+                traceback_text = ''.join(traceback.format_tb(error.__traceback__))
+                message = f'{error_name}: "{error}"\n{traceback_text}'
+                errors.append(AUDIO_VERIFICATION_CHECK(input_file, message))
+
+        error_data = ''.join(errors)
+        if errors and is_process:
+            self.error_log_var.set(error_data)
 
         if is_process:
             return is_good
+        return is_good, error_data
+
+    def verify_processing_inputs(self):
+        """Verify every selected input before starting model inference."""
+        if (
+            self.chosen_process_method_var.get() == AUDIO_TOOLS
+            and self.chosen_audio_tool_var.get() in (ALIGN_INPUTS, MATCH_INPUTS)
+        ):
+            if self.DualBatch_inputPaths:
+                inputs = [
+                    input_file
+                    for input_pair in self.DualBatch_inputPaths
+                    for input_file in input_pair
+                ]
+            else:
+                inputs = [
+                    self.fileOneEntry_Full_var.get(),
+                    self.fileTwoEntry_Full_var.get(),
+                ]
         else:
-            return is_good, error_data
+            inputs = list(self.inputPaths)
+
+        failures = []
+        total = len(inputs)
+        for index, input_file in enumerate(inputs, start=1):
+            self.conversion_Button_Text_var.set(f'Verifying Input {index}/{total}')
+            self.update_idletasks()
+            is_good, error_data = self.verify_audio(input_file, is_process=False)
+            if not is_good:
+                failures.append(error_data)
+
+        self.conversion_Button_Text_var.set(START_PROCESSING)
+        if not failures:
+            return True
+
+        self.error_log_var.set(''.join(failures))
+        messagebox.showerror(
+            parent=root,
+            title='Input Verification Failed',
+            message=(
+                f'{len(failures)} input file(s) could not be read. '
+                'Processing was stopped. Open the Error Log for details.'
+            ),
+        )
+        return False
       
     def create_sample(self, audio_file, sample_path=SAMPLE_CLIP_PATH):
         try:
@@ -6145,6 +6191,9 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             self.error_dialoge(INVALID_EXPORT)
             return
 
+        if not self.verify_processing_inputs():
+            return
+
         if not self.process_storage_check():
             return
 
@@ -6232,16 +6281,19 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
     def process_tool_start(self):
         """Start the conversion for all the given mp3 and wav files"""
 
+        output_timestamp = datetime.now()
+
         def time_elapsed():
             return f'Time Elapsed: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - stime)))}'
 
         def get_audio_file_base(audio_file):
             if audio_tool.audio_tool == MANUAL_ENSEMBLE:
-                return f'{os.path.splitext(os.path.basename(inputPaths[0]))[0]}'
+                source_path = inputPaths[0]
             elif audio_tool.audio_tool in [ALIGN_INPUTS, MATCH_INPUTS]:
-                return f'{os.path.splitext(os.path.basename(audio_file[0]))[0]}'
+                source_path = audio_file[0]
             else:
-                return f'{os.path.splitext(os.path.basename(audio_file))[0]}'
+                source_path = audio_file
+            return clean_output_base(source_path, output_timestamp)
 
         def handle_ensemble(inputPaths, audio_file_base):
             self.progress_bar_main_var.set(50)
@@ -6490,6 +6542,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         """Start the conversion for all the given mp3 and wav files"""
         
         stime = time.perf_counter()
+        output_timestamp = datetime.now()
         time_elapsed = lambda:f'Time Elapsed: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - stime)))}'
         export_path = self.export_path_var.get()
         is_ensemble = False
@@ -6523,6 +6576,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             for file_num, audio_file in enumerate(inputPaths, start=1):
                 self.cached_sources_clear()
                 base_text = self.process_get_baseText(total_files=inputPath_total_len, file_num=file_num)
+                original_audio_file = audio_file
 
                 if self.verify_audio(audio_file):
                     audio_file = self.create_sample(audio_file) if is_model_sample_mode else audio_file
@@ -6547,7 +6601,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     set_progress_bar = lambda step, inference_iterations=0:self.process_update_progress(total_files=inputPath_total_len, step=(step + (inference_iterations)))
                     write_to_console = lambda progress_text, base_text=base_text:self.command_Text.write(base_text + progress_text)
 
-                    audio_file_base = f"{file_num}_{os.path.splitext(os.path.basename(audio_file))[0]}"
+                    audio_file_base = clean_output_base(original_audio_file, output_timestamp)
                     audio_file_base = audio_file_base if not self.is_testing_audio_var.get() or is_ensemble else f"{round(time.time())}_{audio_file_base}"
                     audio_file_base = audio_file_base if not is_ensemble else f"{audio_file_base}_{current_model.model_basename}"
                     if not is_ensemble:
