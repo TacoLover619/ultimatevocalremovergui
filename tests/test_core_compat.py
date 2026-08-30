@@ -35,14 +35,18 @@ class CoreCompatibilityTests(unittest.TestCase):
 
     def test_uvr_initializes_torch_before_native_gui_and_audio_imports(self):
         imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'UVR.py')
+        self.assertIn('torch', imports)
         torch_index = imports.index('torch')
         for module_name in ('audioread', 'gui_data.sv_ttk', 'librosa', 'pyglet'):
+            self.assertIn(module_name, imports)
             self.assertLess(torch_index, imports.index(module_name))
 
     def test_separator_initializes_torch_before_native_inference_libraries(self):
         imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'separate.py')
+        self.assertIn('torch', imports)
         torch_index = imports.index('torch')
         for module_name in ('scipy', 'audioread', 'librosa', 'onnxruntime'):
+            self.assertIn(module_name, imports)
             self.assertLess(torch_index, imports.index(module_name))
 
     def test_pillow_resize_uses_supported_resampling_api(self):
