@@ -9,7 +9,7 @@ import random
 import typing as tp
 
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 import numpy as np
 import math
@@ -44,7 +44,7 @@ def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=100
     if d_model % 4 != 0:
         raise ValueError(
             "Cannot use sin/cos positional encoding with "
-            "odd dimension (got dim={:d})".format(d_model)
+            f"odd dimension (got dim={d_model:d})"
         )
     pe = torch.zeros(d_model, height, width)
     # Each dimension use half of d_model
@@ -517,7 +517,7 @@ class CrossTransformerEncoderLayer(nn.Module):
         elif activation == "gelu":
             return F.gelu
 
-        raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
+        raise RuntimeError(f"activation should be relu/gelu, not {activation}")
 
 
 # ----------------- MULTI-BLOCKS MODELS: -----------------------
@@ -541,7 +541,7 @@ class CrossTransformerEncoder(nn.Module):
         norm_out: bool = False,
         max_period: float = 10000.0,
         weight_decay: float = 0.0,
-        lr: tp.Optional[float] = None,
+        lr: float | None = None,
         layer_scale: bool = False,
         gelu: bool = True,
         sin_random_shift: int = 0,

@@ -66,7 +66,7 @@ def center_trim(tensor: torch.Tensor, reference: tp.Union[torch.Tensor, int]):
     return tensor
 
 
-def pull_metric(history: tp.List[dict], name: str):
+def pull_metric(history: list[dict], name: str):
     out = []
     for metrics in history:
         metric = metrics
@@ -85,8 +85,8 @@ def EMA(beta: float = 1):
 
     Note that for `beta=1`, this is just plain averaging.
     """
-    fix: tp.Dict[str, float] = defaultdict(float)
-    total: tp.Dict[str, float] = defaultdict(float)
+    fix: dict[str, float] = defaultdict(float)
+    total: dict[str, float] = defaultdict(float)
 
     def _update(metrics: dict, weight: float = 1) -> dict:
         nonlocal total, fix

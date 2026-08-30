@@ -8,7 +8,6 @@
 
 import logging
 from pathlib import Path
-import typing as tp
 
 from diffq import DiffQuantizer
 import torch.hub
@@ -18,7 +17,7 @@ from .tasnet_v2 import ConvTasNet
 from .utils import set_state
 
 from .hdemucs import HDemucs
-from .repo import RemoteRepo, LocalRepo, ModelOnlyRepo, BagOnlyRepo, AnyModelRepo, ModelLoadingError  # noqa
+from .repo import RemoteRepo, LocalRepo, ModelOnlyRepo, BagOnlyRepo, AnyModelRepo, ModelLoadingError
 
 logger = logging.getLogger(__name__)
 ROOT_URL = "https://dl.fbaipublicfiles.com/demucs/mdx_final/"
@@ -41,9 +40,9 @@ def add_model_flags(parser):
                         help="Folder containing all pre-trained models for use with -n.")
 
 
-def _parse_remote_files(remote_file_list) -> tp.Dict[str, str]:
+def _parse_remote_files(remote_file_list) -> dict[str, str]:
     root: str = ''
-    models: tp.Dict[str, str] = {}
+    models: dict[str, str] = {}
     for line in remote_file_list.read_text().split('\n'):
         line = line.strip()
         if line.startswith('#'):
@@ -57,7 +56,7 @@ def _parse_remote_files(remote_file_list) -> tp.Dict[str, str]:
     return models
 
 def get_model(name: str,
-              repo: tp.Optional[Path] = None):
+              repo: Path | None = None):
     """`name` must be a bag of models name or a pretrained signature
     from the remote AWS model repo or the specified local repo if `repo` is not None.
     """

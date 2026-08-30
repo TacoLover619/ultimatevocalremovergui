@@ -11,7 +11,7 @@ if getattr(sys, 'frozen', False):
 else:
     BASE_PATH_RUB = os.path.dirname(os.path.abspath(__file__))
 
-__all__ = ['time_stretch', 'pitch_shift']
+__all__ = ['pitch_shift', 'time_stretch']
 
 __RUBBERBAND_UTIL = os.path.join(BASE_PATH_RUB, 'rubberband')
 

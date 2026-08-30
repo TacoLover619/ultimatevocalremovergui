@@ -19,7 +19,7 @@ def int_keys(d):
         r[k] = v
     return r
     
-class ModelParameters(object):
+class ModelParameters:
     def __init__(self, config_path=''):
         with open(config_path, 'r') as f:
                 self.param = json.loads(f.read(), object_pairs_hook=int_keys)

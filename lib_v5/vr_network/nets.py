@@ -7,7 +7,7 @@ from . import layers
 class BaseASPPNet(nn.Module):
 
     def __init__(self, nn_architecture, nin, ch, dilations=(4, 8, 16)):
-        super(BaseASPPNet, self).__init__()
+        super().__init__()
         self.nn_architecture = nn_architecture
         self.enc1 = layers.Encoder(nin, ch, 3, 2, 1)
         self.enc2 = layers.Encoder(ch, ch * 2, 3, 2, 1)
@@ -99,7 +99,7 @@ def determine_model_capacity(n_fft_bins, nn_architecture):
 class CascadedASPPNet(nn.Module):
 
     def __init__(self, n_fft, model_capacity_data, nn_architecture):
-        super(CascadedASPPNet, self).__init__()
+        super().__init__()
         self.stg1_low_band_net = BaseASPPNet(nn_architecture, *model_capacity_data[0])
         self.stg1_high_band_net = BaseASPPNet(nn_architecture, *model_capacity_data[1])
 

@@ -1,4 +1,3 @@
-from typing import Optional
 import torch
 
 def atan2(y, x):
@@ -42,7 +41,7 @@ def _norm(x: torch.Tensor) -> torch.Tensor:
     return torch.abs(x[..., 0]) ** 2 + torch.abs(x[..., 1]) ** 2
 
 
-def _mul_add(a: torch.Tensor, b: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
+def _mul_add(a: torch.Tensor, b: torch.Tensor, out: torch.Tensor | None = None) -> torch.Tensor:
     """Element-wise multiplication of two complex Tensors described
     through their real and imaginary parts.
     The result is added to the `out` tensor"""
@@ -61,7 +60,7 @@ def _mul_add(a: torch.Tensor, b: torch.Tensor, out: Optional[torch.Tensor] = Non
     return out
 
 
-def _mul(a: torch.Tensor, b: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
+def _mul(a: torch.Tensor, b: torch.Tensor, out: torch.Tensor | None = None) -> torch.Tensor:
     """Element-wise multiplication of two complex Tensors described
     through their real and imaginary parts
     can work in place in case out is a only"""
@@ -78,7 +77,7 @@ def _mul(a: torch.Tensor, b: torch.Tensor, out: Optional[torch.Tensor] = None) -
     return out
 
 
-def _inv(z: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
+def _inv(z: torch.Tensor, out: torch.Tensor | None = None) -> torch.Tensor:
     """Element-wise multiplicative inverse of a Tensor with complex
     entries described through their real and imaginary parts.
     can work in place in case out is z"""
@@ -90,7 +89,7 @@ def _inv(z: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
     return out
 
 
-def _conj(z, out: Optional[torch.Tensor] = None) -> torch.Tensor:
+def _conj(z, out: torch.Tensor | None = None) -> torch.Tensor:
     """Element-wise complex conjugate of a Tensor with complex entries
     described through their real and imaginary parts.
     can work in place in case out is z"""
@@ -101,7 +100,7 @@ def _conj(z, out: Optional[torch.Tensor] = None) -> torch.Tensor:
     return out
 
 
-def _invert(M: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
+def _invert(M: torch.Tensor, out: torch.Tensor | None = None) -> torch.Tensor:
     """
     Invert 1x1 or 2x2 matrices
 

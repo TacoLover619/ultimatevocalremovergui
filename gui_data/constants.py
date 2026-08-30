@@ -168,8 +168,8 @@ VOCAL_STEM_ONLY = f'{VOCAL_STEM} Only'
 INST_STEM_ONLY = f'{INST_STEM} Only'
 PRIMARY_STEM_ONLY = f'{PRIMARY_STEM} Only'
 
-IS_SAVE_INST_ONLY = f'save_only_inst'
-IS_SAVE_VOC_ONLY = f'save_only_voc'
+IS_SAVE_INST_ONLY = 'save_only_inst'
+IS_SAVE_VOC_ONLY = 'save_only_voc'
 
 DEVERB_MAPPER = {'Main Vocals Only':VOCAL_STEM, 
                  'Lead Vocals Only':LEAD_VOCAL_STEM_LABEL, 
@@ -373,7 +373,7 @@ NOUT_LSTM_SEL = (64, 128)
 DEMUCS_OVERLAP = (0.25, 0.50, 0.75, 0.99)
 MDX_OVERLAP = (DEF_OPT, 0.25, 0.50, 0.75, 0.99)
 MDX23_OVERLAP = range(2, 51)
-VR_AGGRESSION = range(0, 51)
+VR_AGGRESSION = range(51)
 
 TIME_WINDOW_MAPPER = {
             "None": None,
@@ -403,10 +403,10 @@ INTRO_MAPPER = {
 
 VOLUME_MAPPER = {
             "None": (0, [0]),
-            "Low": (-4, range(0, 8)),
-            "Medium": (-6, range(0, 12)),
-            "High": (-6, [x * 0.5 for x in range(0, 25)]),
-            "Very High": (-10, [x * 0.5 for x in range(0, 41)])}
+            "Low": (-4, range(8)),
+            "Medium": (-6, range(12)),
+            "High": (-6, [x * 0.5 for x in range(25)]),
+            "Very High": (-10, [x * 0.5 for x in range(41)])}
             #"Max": (-10, [x * 0.3 for x in range(0, int(20 / 0.3) + 1)])}
 
 PHASE_MAPPER = {
@@ -1574,7 +1574,7 @@ def secondary_stem(stem:str):
     
     stem = stem if stem else NO_STEM
     
-    if stem in STEM_PAIR_MAPPER.keys():
+    if stem in STEM_PAIR_MAPPER:
         for key, value in STEM_PAIR_MAPPER.items():
             if stem in key:
                 secondary_stem = value

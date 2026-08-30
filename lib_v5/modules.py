@@ -1,10 +1,10 @@
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class TFC(nn.Module):
     def __init__(self, c, l, k, norm):
-        super(TFC, self).__init__()
+        super().__init__()
 
         self.H = nn.ModuleList()
         for i in range(l):
@@ -24,7 +24,7 @@ class TFC(nn.Module):
 
 class DenseTFC(nn.Module):
     def __init__(self, c, l, k, norm):
-        super(DenseTFC, self).__init__()
+        super().__init__()
 
         self.conv = nn.ModuleList()
         for i in range(l):
@@ -45,7 +45,7 @@ class DenseTFC(nn.Module):
 class TFC_TDF(nn.Module):
     def __init__(self, c, l, f, k, bn, dense=False, bias=True, norm=nn.BatchNorm2d):
 
-        super(TFC_TDF, self).__init__()
+        super().__init__()
 
         self.use_tdf = bn is not None
 

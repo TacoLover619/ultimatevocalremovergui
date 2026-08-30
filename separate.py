@@ -844,7 +844,7 @@ class SeperateMDXC(SeperateAttributes):
             sources = {k: pitch_fix(v) if self.is_pitch_change else v for k, v in zip(self.mdx_c_configs.training.instruments, estimated_sources.cpu().detach().numpy())}
             del estimated_sources
             if self.is_denoise_model:
-                if VOCAL_STEM in sources.keys() and INST_STEM in sources.keys():
+                if VOCAL_STEM in sources and INST_STEM in sources:
                     sources[VOCAL_STEM] = vr_denoiser(sources[VOCAL_STEM], self.device, model_path=self.DENOISER_MODEL)
                     if sources[VOCAL_STEM].shape[1] != org_mix.shape[1]:
                         sources[VOCAL_STEM] = spec_utils.match_array_shapes(sources[VOCAL_STEM], org_mix)

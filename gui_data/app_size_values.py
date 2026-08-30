@@ -72,7 +72,7 @@ except Exception:
 
 image_scale_1, image_scale_2 = 20, 30
 
-class ImagePath():
+class ImagePath:
     def __init__(self, base_path):
         img_path = os.path.join(base_path, 'gui_data', 'img')
         credits_path = os.path.join(img_path, 'credits.png')

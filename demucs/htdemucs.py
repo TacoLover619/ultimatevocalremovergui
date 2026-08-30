@@ -420,8 +420,6 @@ class HTDemucs(nn.Module):
     def _spec(self, x):
         hl = self.hop_length
         nfft = self.nfft
-        x0 = x  # noqa
-
         # We re-pad the signal in order to keep the property
         # that the size of the output is exactly the size of the input
         # divided by the stride (here hop_length), when divisible.

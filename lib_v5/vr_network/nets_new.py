@@ -6,7 +6,7 @@ from . import layers_new as layers
 class BaseNet(nn.Module):
 
     def __init__(self, nin, nout, nin_lstm, nout_lstm, dilations=((4, 2), (8, 4), (12, 6))):
-        super(BaseNet, self).__init__()
+        super().__init__()
         self.enc1 = layers.Conv2DBNActiv(nin, nout, 3, 1, 1)
         self.enc2 = layers.Encoder(nout, nout * 2, 3, 2, 1)
         self.enc3 = layers.Encoder(nout * 2, nout * 4, 3, 2, 1)
@@ -41,7 +41,7 @@ class BaseNet(nn.Module):
 class CascadedNet(nn.Module):
 
     def __init__(self, n_fft, nn_arch_size=51000, nout=32, nout_lstm=128):
-        super(CascadedNet, self).__init__()
+        super().__init__()
         self.max_bin = n_fft // 2
         self.output_bin = n_fft // 2 + 1
         self.nin_lstm = self.max_bin // 2

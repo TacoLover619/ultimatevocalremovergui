@@ -27,7 +27,7 @@ import wget
 import traceback
 import matchering as match
 import tkinter as tk
-import tkinter.ttk as ttk
+from tkinter import ttk
 from tkinter.font import Font
 from tkinter import filedialog
 from tkinter import messagebox
@@ -52,7 +52,6 @@ from separate import (
     cuda_available, mps_available, #directml_available,
 )
 from playsound import playsound
-from typing import List
 import onnx
 import re
 import sys
@@ -326,7 +325,7 @@ def drop(event, accept_mode: str = 'files'):
     else:
         return    
 
-class ModelData():
+class ModelData:
     def __init__(self, model_name: str, 
                  selected_process_method=ENSEMBLE_MODE, 
                  is_secondary_model=False, 
@@ -650,7 +649,7 @@ class ModelData():
         else:
             self.model_path = os.path.join(MDX_MODELS_DIR, f"{self.model_name}{ext}")
             
-        self.mixer_path = os.path.join(MDX_MODELS_DIR, f"mixer_val.ckpt")
+        self.mixer_path = os.path.join(MDX_MODELS_DIR, "mixer_val.ckpt")
     
     def get_demucs_model_path(self):
         
@@ -745,7 +744,7 @@ class ModelData():
                 
         #print(self.model_name," - ", self.model_hash)
 
-class Ensembler():
+class Ensembler:
     def __init__(self, is_manual_ensemble=False):
         self.is_save_all_outputs_ensemble = root.is_save_all_outputs_ensemble_var.get()
         chosen_ensemble_name = '{}'.format(root.chosen_ensemble_var.get().replace(" ", "_")) if not root.chosen_ensemble_var.get() == CHOOSE_ENSEMBLE_OPTION else 'Ensembled'
@@ -756,7 +755,7 @@ class Ensembler():
         self.main_export_path = Path(root.export_path_var.get())
         self.chosen_ensemble = f"_{chosen_ensemble_name}" if root.is_append_ensemble_name_var.get() else ''
         ensemble_folder_name = self.main_export_path if self.is_save_all_outputs_ensemble else ENSEMBLE_TEMP_PATH
-        self.ensemble_folder_name = os.path.join(ensemble_folder_name, '{}_Outputs_{}'.format(chosen_ensemble_name, time_stamp))
+        self.ensemble_folder_name = os.path.join(ensemble_folder_name, f'{chosen_ensemble_name}_Outputs_{time_stamp}')
         self.is_testing_audio = f"{time_stamp}_" if root.is_testing_audio_var.get() else ''
         self.primary_algorithm = ensemble_algorithm[0]
         self.secondary_algorithm = ensemble_algorithm[2]
@@ -786,7 +785,7 @@ class Ensembler():
 
         stem_outputs = self.get_files_to_ensemble(folder=export_path, prefix=audio_file_base, suffix=f"_({stem_tag}).wav")
         audio_file_output = f"{self.is_testing_audio}{audio_file_base}{self.chosen_ensemble}_({stem_tag})"
-        stem_save_path = os.path.join('{}'.format(self.main_export_path),'{}.wav'.format(audio_file_output))
+        stem_save_path = os.path.join(f'{self.main_export_path}',f'{audio_file_output}.wav')
         
         #print("get_files_to_ensemble: ", stem_outputs)
         
@@ -826,7 +825,7 @@ class Ensembler():
         
         algorithm = root.choose_algorithm_var.get()
         algorithm_text = "" if is_bulk else f"_({root.choose_algorithm_var.get()})"
-        stem_save_path = os.path.join('{}'.format(self.main_export_path),'{}{}{}.wav'.format(self.is_testing_audio, audio_file_base, algorithm_text))
+        stem_save_path = os.path.join(f'{self.main_export_path}',f'{self.is_testing_audio}{audio_file_base}{algorithm_text}.wav')
         spec_utils.ensemble_inputs(audio_inputs, algorithm, self.is_normalization, self.wav_type_set, stem_save_path, is_wave=self.is_wav_ensemble)
         save_format(stem_save_path, self.save_format, self.mp3_bit_set)
 
@@ -842,7 +841,7 @@ class Ensembler():
                                  self.wav_type_set,
                                  save_format=save_format_)
 
-class AudioTools():
+class AudioTools:
     def __init__(self, audio_tool):
         time_stamp = round(time.time())
         self.audio_tool = audio_tool
@@ -865,8 +864,8 @@ class AudioTools():
         audio_file_base = f"{self.is_testing_audio}{audio_file_base}"
         audio_file_2_base = f"{self.is_testing_audio}{audio_file_2_base}"
         
-        aligned_path = os.path.join('{}'.format(self.main_export_path),'{}_(Aligned).wav'.format(audio_file_2_base))
-        inverted_path = os.path.join('{}'.format(self.main_export_path),'{}_(Inverted).wav'.format(audio_file_base))
+        aligned_path = os.path.join(f'{self.main_export_path}',f'{audio_file_2_base}_(Aligned).wav')
+        inverted_path = os.path.join(f'{self.main_export_path}',f'{audio_file_base}_(Inverted).wav')
 
         spec_utils.align_audio(audio_inputs[0], 
                                audio_inputs[1], 
@@ -890,9 +889,9 @@ class AudioTools():
         target = audio_inputs[0]
         reference = audio_inputs[1]
         
-        command_Text(f"Processing... ")
+        command_Text("Processing... ")
         
-        save_path = os.path.join('{}'.format(self.main_export_path),'{}_(Matched).wav'.format(f"{self.is_testing_audio}{audio_file_base}"))
+        save_path = os.path.join(f'{self.main_export_path}','{}_(Matched).wav'.format(f"{self.is_testing_audio}{audio_file_base}"))
         
         match.process(
             target=target,
@@ -919,7 +918,7 @@ class AudioTools():
         save_path = os.path.join(self.main_export_path, f"{self.is_testing_audio}{audio_file_base}{file_text}.wav")
         spec_utils.augment_audio(save_path, audio_file, rate, self.is_normalization, self.wav_type_set, self.save_format, is_pitch=is_pitch, is_time_correction=is_time_correction)
    
-class ToolTip(object):
+class ToolTip:
 
     def __init__(self, widget):
         self.widget = widget
@@ -1307,11 +1306,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.withdraw()
         self.title('Ultimate Vocal Remover')
         # Set Geometry and Center Window
-        self.geometry('{width}x{height}+{xpad}+{ypad}'.format(
-            width=self.main_window_width,
-            height=height,
-            xpad=int(self.winfo_screenwidth()/2 - width/2),
-            ypad=int(self.winfo_screenheight()/2 - height/2 - 30)))
+        self.geometry(f'{self.main_window_width}x{height}+{int(self.winfo_screenwidth()/2 - width/2)}+{int(self.winfo_screenheight()/2 - height/2 - 30)}')
  
         self.iconbitmap(ICON_IMG_PATH) if is_windows else self.tk.call('wm', 'iconphoto', self._w, tk.PhotoImage(file=MAIN_ICON_IMG_PATH))
         self.protocol("WM_DELETE_WINDOW", self.save_values)
@@ -1573,12 +1568,12 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             missing_models = [model.model_status for model in model_data if not model.model_status]
             
             if missing_models or not model_data:
-                model_data: List[ModelData] = [ModelData(model_name, is_dry_check=is_dry_check) for model_name in self.ensemble_model_list]
+                model_data: list[ModelData] = [ModelData(model_name, is_dry_check=is_dry_check) for model_name in self.ensemble_model_list]
                 self.model_data_table = model_data
 
         if arch_type == KARAOKEE_CHECK:
             model_list = []
-            model_data: List[ModelData] = [ModelData(model_name, is_dry_check=is_dry_check) for model_name in self.default_change_model_list]
+            model_data: list[ModelData] = [ModelData(model_name, is_dry_check=is_dry_check) for model_name in self.default_change_model_list]
             for model in model_data:
                 if model.model_status and model.is_karaoke or model.is_bv_model:
                     model_list.append(model.model_and_process_tag)
@@ -1586,15 +1581,15 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             return model_list
 
         if arch_type == ENSEMBLE_MODE:
-            model_data: List[ModelData] = [ModelData(model_name) for model_name in self.ensemble_listbox_get_all_selected_models()]
+            model_data: list[ModelData] = [ModelData(model_name) for model_name in self.ensemble_listbox_get_all_selected_models()]
         if arch_type == ENSEMBLE_CHECK:
-            model_data: List[ModelData] = [ModelData(model, is_change_def=is_change_def, is_get_hash_dir_only=is_get_hash_dir_only)]
+            model_data: list[ModelData] = [ModelData(model, is_change_def=is_change_def, is_get_hash_dir_only=is_get_hash_dir_only)]
         if arch_type == VR_ARCH_TYPE or arch_type == VR_ARCH_PM:
-            model_data: List[ModelData] = [ModelData(model, VR_ARCH_TYPE)]
+            model_data: list[ModelData] = [ModelData(model, VR_ARCH_TYPE)]
         if arch_type == MDX_ARCH_TYPE:
-            model_data: List[ModelData] = [ModelData(model, MDX_ARCH_TYPE)]
+            model_data: list[ModelData] = [ModelData(model, MDX_ARCH_TYPE)]
         if arch_type == DEMUCS_ARCH_TYPE:
-            model_data: List[ModelData] = [ModelData(model, DEMUCS_ARCH_TYPE)]#
+            model_data: list[ModelData] = [ModelData(model, DEMUCS_ARCH_TYPE)]#
 
         return model_data
         
@@ -2174,7 +2169,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         elif dialoge_type == CHOOSE_EXPORT_FIR:
             filenames = filedialog.askdirectory(
                                     parent=parent_win,
-                                    title=f'Select Folder',)
+                                    title='Select Folder',)
             
         if is_linux:
             print("Is Linux")
@@ -2393,7 +2388,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 close_method()
             open_method()
         except Exception as e:
-            self.error_log_var.set("{}".format(error_text(menu, e)))
+            self.error_log_var.set(f"{error_text(menu, e)}")
 
     def input_right_click_menu(self, event):
 
@@ -2447,13 +2442,13 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
     def cached_model_source_holder(self, process_method, sources, model_name=None):
         
         if process_method == VR_ARCH_TYPE:
-            self.vr_cache_source_mapper = {**self.vr_cache_source_mapper, **{model_name: sources}}
+            self.vr_cache_source_mapper = {**self.vr_cache_source_mapper, model_name: sources}
         if process_method == MDX_ARCH_TYPE:
-            self.mdx_cache_source_mapper = {**self.mdx_cache_source_mapper, **{model_name: sources}}
+            self.mdx_cache_source_mapper = {**self.mdx_cache_source_mapper, model_name: sources}
         if process_method == DEMUCS_ARCH_TYPE:
-            self.demucs_cache_source_mapper = {**self.demucs_cache_source_mapper, **{model_name: sources}}
+            self.demucs_cache_source_mapper = {**self.demucs_cache_source_mapper, model_name: sources}
   
-    def cached_source_model_list_check(self, model_list: List[ModelData]):
+    def cached_source_model_list_check(self, model_list: list[ModelData]):
 
         model: ModelData
         primary_model_names = lambda process_method:[model.model_basename if model.process_method == process_method else None for model in model_list]
@@ -2918,7 +2913,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     if is_create_samples:
                         export_dir = get_export_dir()
                         if not export_dir:
-                            input_info_text_var.set(f'No export directory selected.')
+                            input_info_text_var.set('No export directory selected.')
                             return
                     is_good, error_data = self.verify_audio(i, is_process=False, sample_path=export_dir)
                     if not is_good:
@@ -2939,7 +2934,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     self.inputPaths = tuple(inputPaths)
                     self.update_inputPaths()
                 else:
-                    input_info_text_var.set(f'No errors found!')
+                    input_info_text_var.set('No errors found!')
                     
                 audio_input_total()
             else:
@@ -5192,7 +5187,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                             self.app_update_button_Text_var.set('Click Here to Update')
                         
                         if OPERATING_SYSTEM == "Windows":
-                            self.download_update_link_var.set('{}{}{}'.format(UPDATE_REPO, self.lastest_version, application_extension))
+                            self.download_update_link_var.set(f'{UPDATE_REPO}{self.lastest_version}{application_extension}')
                             self.download_update_path_var.set(os.path.join(BASE_PATH, f'{self.lastest_version}{application_extension}'))
                         elif OPERATING_SYSTEM == "Darwin":
                             self.download_update_link_var.set(UPDATE_MAC_ARM_REPO if SYSTEM_PROC == ARM or ARM in SYSTEM_ARCH else UPDATE_MAC_X86_64_REPO)
@@ -5418,7 +5413,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         if type == VR_ARCH_TYPE:
             for selected_model in self.vr_download_list.items():
                 if selection in selected_model:
-                    self.download_link_path_var.set("{}{}".format(model_repo, selected_model[1]))
+                    self.download_link_path_var.set(f"{model_repo}{selected_model[1]}")
                     self.download_save_path_var.set(os.path.join(VR_MODELS_DIR, selected_model[1]))
                     break
                 
@@ -5429,7 +5424,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                         model_name = list(selected_model[1].keys())[0]
                     else:
                         model_name = str(selected_model[1])
-                    self.download_link_path_var.set("{}{}".format(model_repo, model_name))
+                    self.download_link_path_var.set(f"{model_repo}{model_name}")
                     self.download_save_path_var.set(os.path.join(MDX_MODELS_DIR, model_name))
                     break
 
@@ -5481,7 +5476,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 else:
                     if self.select_download_var.get() == DEMUCS_ARCH_TYPE and is_demucs_newer:
                         for model_num, model_data in enumerate(self.download_demucs_newer_models, start=1):
-                            self.download_progress_info_var.set('{} {}/{}...'.format(DOWNLOADING_ITEM, model_num, len(self.download_demucs_newer_models)))
+                            self.download_progress_info_var.set(f'{DOWNLOADING_ITEM} {model_num}/{len(self.download_demucs_newer_models)}...')
                             if os.path.isfile(model_data[0]):
                                 continue
                             else:
@@ -6178,7 +6173,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             
         appropriate_storage = True
             
-        if int(free/1.074e+9) <= int(2):
+        if int(free/1.074e+9) <= 2:
             self.error_dialoge([STORAGE_ERROR[0], f'{STORAGE_ERROR[1]}{space_details}'])
             appropriate_storage = False
         
@@ -6232,9 +6227,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         
         init_text = 'Files' if is_dual else 'File'
         
-        text = '{init_text} {file_num}/{total_files} '.format(init_text=init_text,
-                                                              file_num=file_num,
-                                                              total_files=total_files)
+        text = f'{init_text} {file_num}/{total_files} '
         
         return text
 
@@ -6426,7 +6419,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 self.command_Text.write(time_elapsed())
                 playsound(FAIL_CHIME) if self.is_task_complete_var.get() else None
             else:
-                self.command_Text.write('{}{}'.format(process_complete_text, time_elapsed()))
+                self.command_Text.write(f'{process_complete_text}{time_elapsed()}')
                 playsound(COMPLETE_CHIME) if self.is_task_complete_var.get() else None
 
             self.process_end()
@@ -6685,7 +6678,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             self.process_end()
                         
         except Exception as e:
-            self.error_log_var.set("{}{}".format(error_text(self.chosen_process_method_var.get(), e), self.get_settings_list()))
+            self.error_log_var.set(f"{error_text(self.chosen_process_method_var.get(), e)}{self.get_settings_list()}")
             self.command_Text.write(f'\n\n{PROCESS_FAILED}')
             self.command_Text.write(time_elapsed())
             playsound(FAIL_CHIME) if self.is_task_complete_var.get() else None
@@ -6725,7 +6718,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         
         for key, value in DEFAULT_DATA.items():
             if not key in data.keys():
-                data = {**data, **{key:value}}
+                data = {**data, key:value}
                 data['batch_size'] = DEF_OPT
 
         ## ADD_BUTTON
@@ -6872,8 +6865,8 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         """Loads user saved application settings or resets to default"""
         
         for key, value in DEFAULT_DATA.items():
-            if not key in loaded_setting.keys():
-                loaded_setting = {**loaded_setting, **{key:value}}
+            if not key in loaded_setting:
+                loaded_setting = {**loaded_setting, key:value}
                 loaded_setting['batch_size'] = DEF_OPT
                 
         is_default_reset = True if process_method == ENSEMBLE_MODE or is_default_reset else False
@@ -7158,7 +7151,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             
             if is_restart:
                 try:
-                    subprocess.Popen(f'UVR_Launcher.exe')
+                    subprocess.Popen('UVR_Launcher.exe')
                 except Exception:
                     subprocess.Popen(f'python "{__file__}"', shell=True)
             

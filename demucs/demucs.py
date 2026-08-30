@@ -130,13 +130,13 @@ class DConv(nn.Module):
         dilate = depth > 0
 
         norm_fn: tp.Callable[[int], nn.Module]
-        norm_fn = lambda d: nn.Identity()  # noqa
+        norm_fn = lambda d: nn.Identity()
         if norm:
-            norm_fn = lambda d: nn.GroupNorm(1, d)  # noqa
+            norm_fn = lambda d: nn.GroupNorm(1, d)
 
         hidden = int(channels / compress)
 
-        act: tp.Type[nn.Module]
+        act: type[nn.Module]
         if gelu:
             act = nn.GELU
         else:
@@ -335,9 +335,9 @@ class Demucs(nn.Module):
         in_channels = audio_channels
         padding = 0
         for index in range(depth):
-            norm_fn = lambda d: nn.Identity()  # noqa
+            norm_fn = lambda d: nn.Identity()
             if index >= norm_starts:
-                norm_fn = lambda d: nn.GroupNorm(norm_groups, d)  # noqa
+                norm_fn = lambda d: nn.GroupNorm(norm_groups, d)
 
             encode = []
             encode += [

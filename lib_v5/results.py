@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Matchering - Audio Matching and Mastering Python Library

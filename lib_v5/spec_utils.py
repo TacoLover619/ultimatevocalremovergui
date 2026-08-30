@@ -999,7 +999,7 @@ def align_audio(file1,
         if align_window:
             wav_sub = time_correction(wav1, wav2_aligned, seconds_length, align_window=align_window, db_analysis=db_analysis, progress_bar=progress_bar, unique_sources=unique_sources, phase_shifts=phase_shifts)
             wav_sub_size = np.abs(wav_sub).mean()  
-            sub_mapper_big_mapper = {**sub_mapper_big_mapper, **{wav_sub_size:wav_sub}}
+            sub_mapper_big_mapper = {**sub_mapper_big_mapper, wav_sub_size:wav_sub}
         else:
             wav2_aligned = wav2_aligned * np.power(10, db_analysis[0] / 20)
             db_range = db_analysis[1]
@@ -1009,7 +1009,7 @@ def align_audio(file1,
                 s_adjusted = wav2_aligned * (10 ** (db_adjustment / 20))
                 wav_sub = wav1 - s_adjusted
                 wav_sub_size = np.abs(wav_sub).mean() 
-                sub_mapper_big_mapper = {**sub_mapper_big_mapper, **{wav_sub_size:wav_sub}}
+                sub_mapper_big_mapper = {**sub_mapper_big_mapper, wav_sub_size:wav_sub}
             
         #print(sub_mapper_big_mapper.keys(), min(sub_mapper_big_mapper.keys()))
     
@@ -1026,7 +1026,7 @@ def align_audio(file1,
     #print('Final: ', np.abs(wav_sub).mean())
     wav_sub = np.clip(wav_sub, -1, +1)
     
-    command_Text(f"Saving inverted track... ")
+    command_Text("Saving inverted track... ")
 
     if is_save_aligned or is_spec_match:
         wav1 = match_mono_array_shapes(wav1, wav_sub) if is_mono else match_array_shapes(wav1, wav_sub, is_swap=True)
@@ -1167,7 +1167,7 @@ def time_correction(mix:np.ndarray, instrumental:np.ndarray, seconds_length, ali
         # Normalize the result by the overlap count
         sub = np.where(divider > 1e-6, sub / divider, sub)
         sub_size = np.abs(sub).mean()
-        sub_mapper = {**sub_mapper, **{sub_size: sub}}
+        sub_mapper = {**sub_mapper, sub_size: sub}
 
     #print("SUB_LEN", len(list(sub_mapper.values())))
 

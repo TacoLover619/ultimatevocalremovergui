@@ -8,7 +8,6 @@ This code contains the spectrogram and Hybrid version of Demucs.
 """
 from copy import deepcopy
 import math
-import typing as tp
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -17,7 +16,7 @@ from .demucs import DConv, rescale_module
 from .states import capture_init
 from .spec import spectro, ispectro
 
-def pad1d(x: torch.Tensor, paddings: tp.Tuple[int, int], mode: str = 'constant', value: float = 0.):
+def pad1d(x: torch.Tensor, paddings: tuple[int, int], mode: str = 'constant', value: float = 0.):
     """Tiny wrapper around F.pad, just to allow for reflect padding on small input.
     If this is the case, we insert extra 0 padding to the right before the reflection happen."""
     x0 = x
@@ -84,9 +83,9 @@ class HEncLayer(nn.Module):
             rewrite: add 1x1 conv at the end of the layer.
         """
         super().__init__()
-        norm_fn = lambda d: nn.Identity()  # noqa
+        norm_fn = lambda d: nn.Identity()
         if norm:
-            norm_fn = lambda d: nn.GroupNorm(norm_groups, d)  # noqa
+            norm_fn = lambda d: nn.GroupNorm(norm_groups, d)
         if pad:
             pad = kernel_size // 4
         else:
@@ -258,9 +257,9 @@ class HDecLayer(nn.Module):
         Same as HEncLayer but for decoder. See `HEncLayer` for documentation.
         """
         super().__init__()
-        norm_fn = lambda d: nn.Identity()  # noqa
+        norm_fn = lambda d: nn.Identity()
         if norm:
-            norm_fn = lambda d: nn.GroupNorm(norm_groups, d)  # noqa
+            norm_fn = lambda d: nn.GroupNorm(norm_groups, d)
         if pad:
             pad = kernel_size // 4
         else:
@@ -587,8 +586,6 @@ class HDemucs(nn.Module):
     def _spec(self, x):
         hl = self.hop_length
         nfft = self.nfft
-        x0 = x  # noqa
-
         if self.hybrid:
             # We re-pad the signal in order to keep the property
             # that the size of the output is exactly the size of the input

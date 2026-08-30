@@ -50,7 +50,7 @@ class ModelOnlyRepo:
 
 
 class RemoteRepo(ModelOnlyRepo):
-    def __init__(self, models: tp.Dict[str, str]):
+    def __init__(self, models: dict[str, str]):
         self._models = models
 
     def has_model(self, sig: str) -> bool:

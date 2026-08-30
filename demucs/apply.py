@@ -25,9 +25,9 @@ Model = tp.Union[Demucs, HDemucs]
 progress_bar_num = 0
 
 class BagOfModels(nn.Module):
-    def __init__(self, models: tp.List[Model],
-                 weights: tp.Optional[tp.List[tp.List[float]]] = None,
-                 segment: tp.Optional[float] = None):
+    def __init__(self, models: list[Model],
+                 weights: list[list[float]] | None = None,
+                 segment: float | None = None):
         """
         Represents a bag of models with specific weights.
         You should call `apply_model` rather than calling directly the forward here for

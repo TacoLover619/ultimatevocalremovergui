@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+from torch import nn
 from .modules import TFC_TDF
 
 dim_s = 4
@@ -30,7 +30,7 @@ class ConvTDFNet(AbstractMDXNet):
     def __init__(self, target_name, lr, optimizer, dim_c, dim_f, dim_t, n_fft, hop_length,
                  num_blocks, l, g, k, bn, bias, overlap):
 
-        super(ConvTDFNet, self).__init__(
+        super().__init__(
             target_name, lr, optimizer, dim_c, dim_f, dim_t, n_fft, hop_length, overlap)
         #self.save_hyperparameters()
 
@@ -121,7 +121,7 @@ class ConvTDFNet(AbstractMDXNet):
 class Mixer(nn.Module):
     def __init__(self, device, mixer_path):
         
-        super(Mixer, self).__init__()
+        super().__init__()
         
         self.linear = nn.Linear((dim_s+1)*2, dim_s*2, bias=False)
         
