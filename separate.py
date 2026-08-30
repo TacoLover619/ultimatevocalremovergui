@@ -112,6 +112,30 @@ def normalize_spectrogram(magnitude):
     return magnitude
 
 
+def build_vr_windows(magnitude, patches, roi_size, window_size):
+    return np.asarray([
+        magnitude[:, :, index * roi_size:index * roi_size + window_size]
+        for index in range(patches)
+    ])
+
+
+def predict_vr_mask(model, windows, batch_size, device, on_batch=None, error_message=None):
+    masks = []
+    with torch.inference_mode():
+        for start in range(0, len(windows), batch_size):
+            if on_batch is not None:
+                on_batch()
+            batch = torch.from_numpy(windows[start:start + batch_size]).to(device)
+            prediction = model.predict_mask(batch)
+            if error_message and prediction.shape[3] <= 0:
+                raise ValueError(error_message)
+            masks.append(np.concatenate(prediction.detach().cpu().numpy(), axis=2))
+
+    if not masks:
+        raise ValueError(error_message or 'VR inference produced no patches')
+    return np.concatenate(masks, axis=2)
+
+
 def backend_output_to_tensor(output, device):
     return torch.as_tensor(output, device=device)
 
@@ -1220,36 +1244,29 @@ class SeperateVR(SeperateAttributes):
 
     def inference_vr(self, X_spec, device, aggressiveness):
         def _execute(X_mag_pad, roi_size):
-            X_dataset = []
             patches = (X_mag_pad.shape[2] - 2 * self.model_run.offset) // roi_size
-            total_iterations = patches//self.batch_size if not self.is_tta else (patches//self.batch_size)*2
-            for i in range(patches):
-                start = i * roi_size
-                X_mag_window = X_mag_pad[:, :, start:start + self.window_size]
-                X_dataset.append(X_mag_window)
-
-            X_dataset = np.asarray(X_dataset)
+            batch_iterations = max(1, math.ceil(patches / self.batch_size))
+            total_iterations = batch_iterations * (2 if self.is_tta else 1)
+            X_dataset = build_vr_windows(
+                X_mag_pad,
+                patches,
+                roi_size,
+                self.window_size,
+            )
             self.model_run.eval()
-            with torch.no_grad():
-                mask = []
-                for i in range(0, patches, self.batch_size):
-                    self.progress_value += 1
-                    if self.progress_value >= total_iterations:
-                        self.progress_value = total_iterations
-                    self.set_progress_bar(0.1, 0.8/total_iterations*self.progress_value)
-                    X_batch = X_dataset[i: i + self.batch_size]
-                    X_batch = torch.from_numpy(X_batch).to(device)
-                    pred = self.model_run.predict_mask(X_batch)
-                    if not pred.size()[3] > 0:
-                        raise Exception(ERROR_MAPPER[WINDOW_SIZE_ERROR])
-                    pred = pred.detach().cpu().numpy()
-                    pred = np.concatenate(pred, axis=2)
-                    mask.append(pred)
-                if len(mask) == 0:
-                    raise Exception(ERROR_MAPPER[WINDOW_SIZE_ERROR])
-                
-                mask = np.concatenate(mask, axis=2)
-            return mask
+
+            def update_progress():
+                self.progress_value = min(self.progress_value + 1, total_iterations)
+                self.set_progress_bar(0.1, 0.8 / total_iterations * self.progress_value)
+
+            return predict_vr_mask(
+                self.model_run,
+                X_dataset,
+                self.batch_size,
+                device,
+                on_batch=update_progress,
+                error_message=ERROR_MAPPER[WINDOW_SIZE_ERROR],
+            )
 
         def postprocess(mask, X_mag, X_phase):
             is_non_accom_stem = False
@@ -1503,29 +1520,9 @@ def vr_denoiser(X, device, hop_length=1024, n_fft=2048, cropsize=256, is_deverbe
     X_mag_pad = np.pad(X_mag, ((0, 0), (0, 0), (pad_l, pad_r)), mode='constant')
     normalize_spectrogram(X_mag_pad)
 
-    X_dataset = []
     patches = (X_mag_pad.shape[2] - 2 * model.offset) // roi_size
-    for i in range(patches):
-        start = i * roi_size
-        X_mag_crop = X_mag_pad[:, :, start:start + cropsize]
-        X_dataset.append(X_mag_crop)
-
-    X_dataset = np.asarray(X_dataset)
-
-    with torch.no_grad():
-        mask = []
-        # To reduce the overhead, dataloader is not used.
-        for i in range(0, patches, batchsize):
-            X_batch = X_dataset[i: i + batchsize]
-            X_batch = torch.from_numpy(X_batch).to(device)
-
-            pred = model.predict_mask(X_batch)
-
-            pred = pred.detach().cpu().numpy()
-            pred = np.concatenate(pred, axis=2)
-            mask.append(pred)
-
-        mask = np.concatenate(mask, axis=2)
+    X_dataset = build_vr_windows(X_mag_pad, patches, roi_size, cropsize)
+    mask = predict_vr_mask(model, X_dataset, batchsize, device)
     
     mask = mask[:, :, :n_frame]
 
