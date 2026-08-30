@@ -172,14 +172,83 @@ directory every time UVR starts.
 
 [`build_windows.ps1`](build_windows.ps1) automates the complete build:
 
-1. Optionally removes and recreates the project virtual environment.
-2. Creates a Python 3.12 virtual environment.
-3. Installs the locked Windows dependencies.
-4. Downloads FFmpeg and Rubber Band from their published distributions.
-5. Extracts the required executables into a stable build location.
-6. Runs PyInstaller with `UVR-Windows.spec`.
+#### Windows build requirements
 
-The result is written to:
+Use a 64-bit Windows 11 machine with the following software:
+
+- Git for Windows.
+- 64-bit Python 3.12.
+- Inno Setup 6.5 or newer.
+- PowerShell 7 or Windows PowerShell 5.1.
+- Internet access for Python packages, FFmpeg, and Rubber Band.
+- At least 15 GB of free disk space for downloads, the virtual environment,
+  PyInstaller work files, the portable application, and installer files.
+
+Python 3.12 and Inno Setup can be installed from an elevated PowerShell window:
+
+```powershell
+winget install --id Python.Python.3.12 --exact
+winget install --id JRSoftware.InnoSetup --exact
+```
+
+Close and reopen PowerShell after installing Python so the updated `PATH` is
+available.
+
+#### Clone and build
+
+Run these commands in PowerShell:
+
+```powershell
+git clone https://github.com/TacoLover619/ultimatevocalremovergui.git
+Set-Location .\ultimatevocalremovergui
+.\build_windows.ps1 -CleanEnvironment
+```
+
+If Python 3.12 is installed but is not the default `python` command, pass its
+full path:
+
+```powershell
+.\build_windows.ps1 -CleanEnvironment `
+    -PythonBootstrap 'C:\Users\YOUR-NAME\AppData\Local\Programs\Python\Python312\python.exe'
+```
+
+The `-CleanEnvironment` switch removes only the `.venv` directory inside this
+repository and recreates it. Omit the switch to reuse an existing environment:
+
+```powershell
+.\build_windows.ps1
+```
+
+#### What the build script does
+
+The script performs these steps in order:
+
+1. Resolves the repository directory and `.venv` path.
+2. Checks that any environment selected for removal is inside the repository.
+3. Creates `.venv` with the selected Python 3.12 executable.
+4. Updates `pip` inside the isolated environment.
+5. Creates `third_party\downloads` and `third_party\bin`.
+6. Downloads the FFmpeg essentials archive from gyan.dev when `ffmpeg.exe` is
+   not already staged.
+7. Extracts and copies `ffmpeg.exe` into `third_party\bin`.
+8. Downloads the Rubber Band 3.3.0 Windows archive when `rubberband.exe` is not
+   already staged.
+9. Extracts and copies `rubberband.exe` and `sndfile.dll` into
+   `third_party\bin`.
+10. Installs the exact package versions from `requirements-windows.lock.txt`.
+11. Runs PyInstaller with `UVR-Windows.spec` and a clean analysis cache.
+12. Locates Inno Setup in the current user's program directory or either
+    standard Program Files directory.
+13. Runs Inno Setup with `UVR-Windows.iss` to create the release installer.
+
+PyInstaller gathers the application source, GUI resources, bundled model data,
+PyTorch, CUDA libraries, ONNX Runtime, Librosa, FFmpeg, Rubber Band, and their
+required native libraries. It builds a directory-based application because a
+single-file package would extract several gigabytes every time UVR starts.
+
+#### Build outputs
+
+The portable application is written to:
 
 ```text
 dist\Ultimate Vocal Remover\Ultimate Vocal Remover.exe
@@ -188,15 +257,58 @@ dist\Ultimate Vocal Remover\Ultimate Vocal Remover.exe
 The whole `Ultimate Vocal Remover` directory must remain together because the
 executable depends on its `_internal` directory.
 
-The release build additionally wraps this directory in an Inno Setup installer
-named `UVR_v6.0.0_setup.exe`. Because GitHub restricts each release asset to
-less than 2 GiB, the CUDA payload is split into numbered `.bin` files. Download
-the setup EXE and every matching `.bin` file into the same folder, then run the
-EXE. The installer creates Start Menu and optional Desktop shortcuts and
-registers a standard Windows uninstaller.
+Inno Setup writes the release files to:
 
-Full rebuild commands and prerequisites are documented in
-[`WINDOWS_BUILD.md`](WINDOWS_BUILD.md).
+```text
+installer\UVR_v6.0.0_setup.exe
+installer\UVR_v6.0.0_setup-1.bin
+installer\UVR_v6.0.0_setup-2.bin
+```
+
+The exact number of `.bin` files can change if the compressed application size
+changes. `UVR-Windows.iss` limits each payload file to 1,900,000,000 bytes so it
+stays below GitHub's 2 GiB release asset limit. The setup EXE and every numbered
+`.bin` file must remain together in the same directory.
+
+The installer targets 64-bit Windows 10 build 17763 or newer, including Windows
+11. It installs per user under `%LOCALAPPDATA%\Programs\Ultimate Vocal Remover`,
+adds a Start Menu shortcut, offers an optional Desktop shortcut, and registers
+a Windows uninstaller.
+
+#### Verify the completed build
+
+Run the source and inference tests:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m compileall -q UVR.py separate.py demucs lib_v5 gui_data tests
+```
+
+Confirm the portable application starts:
+
+```powershell
+& '.\dist\Ultimate Vocal Remover\Ultimate Vocal Remover.exe'
+```
+
+Test the actual installer from an empty directory. Keep all installer parts in
+that directory, run `UVR_v6.0.0_setup.exe`, start UVR from the Start Menu, and
+confirm that it can be removed from Windows Installed Apps.
+
+Generate release checksums with:
+
+```powershell
+Get-ChildItem .\installer\UVR_v6.0.0_setup* -File |
+    Get-FileHash -Algorithm SHA256 |
+    Format-Table Hash, Path
+```
+
+The executable and installer are not Authenticode-signed by this build process.
+Sign the setup EXE and any other executable files before publishing if a code
+signing certificate is available. Unsigned builds can trigger a Windows
+SmartScreen warning.
+
+[`WINDOWS_BUILD.md`](WINDOWS_BUILD.md) contains the same short command reference
+for developers who already know the full process.
 
 ### Automated core tests
 
