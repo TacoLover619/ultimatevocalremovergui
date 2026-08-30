@@ -39,6 +39,7 @@ from gui_data.app_size_values import *
 from gui_data.error_handling import error_text, error_dialouge
 from gui_data.old_data_check import file_check, remove_unneeded_yamls, remove_temps
 from gui_data.model_hash import hash_model_file
+from gui_data.audio_format import detect_common_audio_format
 from gui_data.output_naming import clean_output_base, default_output_directory
 from gui_data.settings_store import load_settings, save_settings
 from gui_data.update_checker import get_latest_release, update_available
@@ -279,6 +280,7 @@ def drop(event, accept_mode: str = 'files'):
         
         if accept_mode == 'files':
             root.inputPaths = tuple(path)
+            root.apply_input_defaults()
             root.process_input_selections()
             root.update_inputPaths()
         elif accept_mode in [FILE_1, FILE_2]:
@@ -2149,7 +2151,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
 
         if paths:  # Path selected
             self.inputPaths = paths
-            self.export_path_var.set(default_output_directory(paths))
+            self.apply_input_defaults()
             self.process_input_selections()
             self.update_inputPaths()
 
@@ -2165,7 +2167,12 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             export_path = self.export_path_var.get()
             
         return export_path
-     
+
+    def apply_input_defaults(self):
+        """Set output location and format from the selected input files."""
+        self.export_path_var.set(default_output_directory(self.inputPaths))
+        self.save_format_var.set(detect_common_audio_format(self.inputPaths))
+
     def update_inputPaths(self):
         """Update the music file entry"""
         
