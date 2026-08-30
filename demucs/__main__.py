@@ -164,7 +164,8 @@ def main():
             build_musdb_metadata(args.metadata, args.musdb, args.workers)
         if args.world_size > 1:
             distributed.barrier()
-        metadata = json.load(open(args.metadata))
+        with open(args.metadata, encoding='utf-8') as metadata_file:
+            metadata = json.load(metadata_file)
         duration = Fraction(samples + args.data_stride, args.samplerate)
         stride = Fraction(args.data_stride, args.samplerate)
         train_set = StemsSet(get_musdb_tracks(args.musdb, subsets=["train"], split="train"),
@@ -233,7 +234,8 @@ def main():
             "duration": duration
         })
         if args.rank == 0:
-            json.dump(saved.metrics, open(metrics_path, "w"))
+            with open(metrics_path, 'w', encoding='utf-8') as metrics_file:
+                json.dump(saved.metrics, metrics_file)
 
         saved.last_state = model.state_dict()
         saved.optimizer = optimizer.state_dict()

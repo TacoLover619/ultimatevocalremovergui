@@ -6,13 +6,11 @@ import time
 import torch
 import audioread
 import gui_data.sv_ttk
-import hashlib
 import json
 import librosa
 import math
 import natsort
 import os
-import pickle
 import psutil
 from pyglet import font as pyglet_font
 import pyperclip
@@ -40,6 +38,10 @@ from gui_data.constants import *
 from gui_data.app_size_values import *
 from gui_data.error_handling import error_text, error_dialouge
 from gui_data.old_data_check import file_check, remove_unneeded_yamls, remove_temps
+from gui_data.model_hash import hash_model_file
+from gui_data.audio_format import detect_common_audio_format
+from gui_data.output_naming import clean_output_base, default_output_directory
+from gui_data.settings_store import load_settings, save_settings
 from gui_data.update_checker import get_latest_release, update_available
 from gui_data.tkinterdnd2 import TkinterDnD, DND_FILES
 from lib_v5.vr_network.model_param_init import ModelParameters
@@ -155,35 +157,10 @@ def close_process(q:queue.Queue):
     thread.start()
 
 def save_data(data):
-    """
-    Saves given data as a .pkl (pickle) file
-
-    Paramters:
-        data(dict):
-            Dictionary containing all the necessary data to save
-    """
-    # Open data file, create it if it does not exist
-    with open('data.pkl', 'wb') as data_file:
-        pickle.dump(data, data_file)
+    save_settings('data.pkl', data)
 
 def load_data() -> dict:
-    """
-    Loads saved pkl file and returns the stored data
-
-    Returns(dict):
-        Dictionary containing all the saved data
-    """
-    try:
-        with open('data.pkl', 'rb') as data_file:  # Open data file
-            data = pickle.load(data_file)
-
-        return data
-    except (ValueError, FileNotFoundError):
-        # Data File is corrupted or not found so recreate it
-
-        save_data(data=DEFAULT_DATA)
-
-        return load_data()
+    return load_settings('data.pkl', DEFAULT_DATA)
 
 def load_model_hash_data(dictionary):
     '''Get the model hash dictionary'''
@@ -303,6 +280,7 @@ def drop(event, accept_mode: str = 'files'):
         
         if accept_mode == 'files':
             root.inputPaths = tuple(path)
+            root.apply_input_defaults()
             root.process_input_selections()
             root.update_inputPaths()
         elif accept_mode in [FILE_1, FILE_2]:
@@ -722,19 +700,10 @@ class ModelData:
         if not os.path.isfile(self.model_path):
             self.model_status = False
         else:
-            if model_hash_table:
-                for (key, value) in model_hash_table.items():
-                    if self.model_path == key:
-                        self.model_hash = value
-                        break
+            self.model_hash = model_hash_table.get(self.model_path)
                     
             if not self.model_hash:
-                try:
-                    with open(self.model_path, 'rb') as f:
-                        f.seek(- 10000 * 1024, 2)
-                        self.model_hash = hashlib.md5(f.read()).hexdigest()
-                except Exception:
-                    self.model_hash = hashlib.md5(open(self.model_path,'rb').read()).hexdigest()
+                self.model_hash = hash_model_file(self.model_path)
                     
                 table_entry = {self.model_path: self.model_hash}
                 model_hash_table.update(table_entry)
@@ -1410,7 +1379,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.is_secondary_stem_only_Demucs_Text_var = tk.StringVar(value='')
         self.scaling_var = tk.DoubleVar(value=1.0)
         self.active_processing_thread = None
-        self.verification_thread = None
         self.is_menu_settings_open = False
         self.is_root_defined_var = tk.BooleanVar(value=False)
         self.is_check_splash = False
@@ -1419,7 +1387,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.is_open_menu_advanced_demucs_options = tk.BooleanVar(value=False)
         self.is_open_menu_advanced_mdx_options = tk.BooleanVar(value=False)
         self.is_open_menu_advanced_ensemble_options = tk.BooleanVar(value=False)
-        self.is_open_menu_view_inputs = tk.BooleanVar(value=False)
         self.is_open_menu_help = tk.BooleanVar(value=False)
         self.is_open_menu_error_log = tk.BooleanVar(value=False)
         self.is_open_menu_advanced_align_options = tk.BooleanVar(value=False)
@@ -1430,7 +1397,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.menu_advanced_ensemble_options_close_window = None
         self.menu_help_close_window = None
         self.menu_error_log_close_window = None
-        self.menu_view_inputs_close_window = None
         self.menu_advanced_align_options_close_window = None
 
         self.mdx_model_params = None
@@ -1671,25 +1637,25 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.filePaths_Frame = ttk.Frame(master=self)
         self.filePaths_Frame.place(x=FILEPATHS_FRAME_X, y=FILEPATHS_FRAME_Y, width=FILEPATHS_FRAME_WIDTH, height=self.FILEPATHS_HEIGHT, relx=0, rely=0, relwidth=1, relheight=0)
 
-        self.filePaths_musicFile_Button = ttk.Button(master=self.filePaths_Frame, text=SELECT_INPUT_TEXT, command=self.input_select_filedialog)
+        self.filePaths_musicFile_Button = self.main_window_LABEL_SET(self.filePaths_Frame, SELECT_INPUT_TEXT)
         self.filePaths_musicFile_Button.place(x=MUSICFILE_BUTTON_X, y=MUSICFILE_BUTTON_Y, width=MUSICFILE_BUTTON_WIDTH, height=MUSICFILE_BUTTON_HEIGHT, relx=0, rely=0, relwidth=0.3, relheight=0.5)
         self.filePaths_musicFile_Entry = ttk.Entry(master=self.filePaths_Frame, textvariable=self.inputPathsEntry_var, font=self.font_entry, state=tk.DISABLED)
         self.filePaths_musicFile_Entry.place(x=MUSICFILE_ENTRY_X, y=MUSICFILE_BUTTON_Y, width=MUSICFILE_ENTRY_WIDTH, height=MUSICFILE_ENTRY_HEIGHT, relx=0.3, rely=0, relwidth=0.7, relheight=0.5)                                   
-        self.filePaths_musicFile_Open = ttk.Button(master=self.filePaths_Frame, image=self.efile_img, command=lambda:OPEN_FILE_func(os.path.dirname(self.inputPaths[0])) if self.inputPaths and os.path.isdir(os.path.dirname(self.inputPaths[0])) else self.error_dialoge(INVALID_INPUT))
+        self.filePaths_musicFile_Open = ttk.Button(master=self.filePaths_Frame, image=self.efile_img, command=self.input_select_filedialog)
         self.filePaths_musicFile_Open.place(x=OPEN_BUTTON_X, y=MUSICFILE_BUTTON_Y, width=OPEN_BUTTON_WIDTH, height=MUSICFILE_ENTRY_HEIGHT, relx=0.3, rely=0, relwidth=0.7, relheight=0.5)   
 
         # Add any additional configurations or method calls here
-        self.filePaths_musicFile_Entry.configure(cursor="hand2")
+        self.filePaths_musicFile_Entry.configure(cursor="arrow")
         self.help_hints(self.filePaths_musicFile_Button, text=INPUT_FOLDER_ENTRY_HELP) 
         self.help_hints(self.filePaths_musicFile_Entry, text=INPUT_FOLDER_ENTRY_HELP_2)
         self.help_hints(self.filePaths_musicFile_Open, text=INPUT_FOLDER_BUTTON_HELP)     
 
         # Save To Option
-        self.filePaths_saveTo_Button = ttk.Button(master=self.filePaths_Frame, text=SELECT_OUTPUT_TEXT, command=self.export_select_filedialog)
+        self.filePaths_saveTo_Button = self.main_window_LABEL_SET(self.filePaths_Frame, SELECT_OUTPUT_TEXT)
         self.filePaths_saveTo_Button.place(x=SAVETO_BUTTON_X, y=SAVETO_BUTTON_Y, width=SAVETO_BUTTON_WIDTH, height=SAVETO_BUTTON_HEIGHT, relx=0, rely=0.5, relwidth=0.3, relheight=0.5)
         self.filePaths_saveTo_Entry = ttk.Entry(master=self.filePaths_Frame, textvariable=self.export_path_var, font=self.font_entry, state=tk.DISABLED)
         self.filePaths_saveTo_Entry.place(x=SAVETO_ENTRY_X, y=SAVETO_BUTTON_Y, width=SAVETO_ENTRY_WIDTH, height=SAVETO_ENTRY_HEIGHT, relx=0.3, rely=0.5, relwidth=0.7, relheight=0.5)
-        self.filePaths_saveTo_Open = ttk.Button(master=self.filePaths_Frame, image=self.efile_img, command=lambda:OPEN_FILE_func(Path(self.export_path_var.get())) if os.path.isdir(self.export_path_var.get()) else self.error_dialoge(INVALID_EXPORT))
+        self.filePaths_saveTo_Open = ttk.Button(master=self.filePaths_Frame, image=self.efile_img, command=self.export_select_filedialog)
         self.filePaths_saveTo_Open.place(x=OPEN_BUTTON_X, y=SAVETO_BUTTON_Y, width=OPEN_BUTTON_WIDTH, height=SAVETO_ENTRY_HEIGHT, relx=0.3, rely=0.5, relwidth=0.7, relheight=0.5)
         self.help_hints(self.filePaths_saveTo_Button, text=OUTPUT_FOLDER_ENTRY_HELP) 
         self.help_hints(self.filePaths_saveTo_Open, text=OUTPUT_FOLDER_BUTTON_HELP)     
@@ -2112,8 +2078,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             
         self.ensemble_listbox_Option.bind('<<ListboxSelect>>', lambda e: self.chosen_ensemble_var.set(CHOOSE_ENSEMBLE_OPTION))
         self.options_Frame.bind(right_click_button, lambda e:(self.right_click_menu_popup(e, main_menu=True), self.options_Frame.focus()))
-        self.filePaths_musicFile_Entry.bind(right_click_button, lambda e:(self.input_right_click_menu(e), self.filePaths_musicFile_Entry.focus()))
-        self.filePaths_musicFile_Entry.bind('<Button-1>', lambda e:(self.check_is_menu_open(INPUTS_MENU), self.filePaths_musicFile_Entry.focus()))
 
         self.fileOne_Entry.bind('<Button-1>', lambda e:self.menu_batch_dual())
         self.fileTwo_Entry.bind('<Button-1>', lambda e:self.menu_batch_dual())
@@ -2187,7 +2151,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
 
         if paths:  # Path selected
             self.inputPaths = paths
-            
+            self.apply_input_defaults()
             self.process_input_selections()
             self.update_inputPaths()
 
@@ -2203,7 +2167,12 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             export_path = self.export_path_var.get()
             
         return export_path
-     
+
+    def apply_input_defaults(self):
+        """Set output location and format from the selected input files."""
+        self.export_path_var.set(default_output_directory(self.inputPaths))
+        self.save_format_var.set(detect_common_audio_format(self.inputPaths))
+
     def update_inputPaths(self):
         """Update the music file entry"""
         
@@ -2378,7 +2347,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 ENSEMBLE_OPTION: (self.is_open_menu_advanced_ensemble_options, self.menu_advanced_ensemble_options, self.menu_advanced_ensemble_options_close_window),
                 HELP_OPTION: (self.is_open_menu_help, self.menu_help, self.menu_help_close_window),
                 ERROR_OPTION: (self.is_open_menu_error_log, self.menu_error_log, self.menu_error_log_close_window),
-                INPUTS_MENU: (self.is_open_menu_view_inputs, self.menu_view_inputs, self.menu_view_inputs_close_window),
                 ALIGNMENT_TOOL: (self.is_open_menu_advanced_align_options, self.menu_advanced_align_options, self.menu_advanced_align_options_close_window)
             }
 
@@ -2388,17 +2356,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             open_method()
         except Exception as e:
             self.error_log_var.set(f"{error_text(menu, e)}")
-
-    def input_right_click_menu(self, event):
-
-        right_click_menu = tk.Menu(self, font=(MAIN_FONT_NAME, FONT_SIZE_1), tearoff=0)
-        right_click_menu.add_command(label='See All Inputs', command=lambda:self.check_is_menu_open(INPUTS_MENU))
-        
-        try:
-            right_click_menu.tk_popup(event.x_root,event.y_root)
-            right_click_release_linux(right_click_menu)
-        finally:
-            right_click_menu.grab_release()
 
     def input_dual_right_click_menu(self, event, is_primary:bool):
         input_path = self.fileOneEntry_Full_var.get() if is_primary else self.fileTwoEntry_Full_var.get()
@@ -2473,31 +2430,76 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.all_models = self.vr_primary_model_names + self.mdx_primary_model_names + self.demucs_primary_model_names + self.vr_secondary_model_names + self.mdx_secondary_model_names + self.demucs_secondary_model_names + self.demucs_pre_proc_model_name
       
     def verify_audio(self, audio_file, is_process=True, sample_path=None):
-        is_good = False
-        error_data = ''
-        
-        if not type(audio_file) is tuple:
-            audio_file = [audio_file]
+        audio_files = audio_file if isinstance(audio_file, (tuple, list)) else [audio_file]
+        is_good = True
+        errors = []
 
-        for i in audio_file:
-            if os.path.isfile(i):
-                try:
-                    librosa.load(i, duration=3, mono=False, sr=44100) if not type(sample_path) is str else self.create_sample(i, sample_path)
-                    is_good = True
-                except Exception as e:
-                    error_name = f'{type(e).__name__}'
-                    traceback_text = ''.join(traceback.format_tb(e.__traceback__))
-                    message = f'{error_name}: "{e}"\n{traceback_text}"'
-                    if is_process:
-                        audio_base_name = os.path.basename(i)
-                        self.error_log_var.set(f'{ERROR_LOADING_FILE_TEXT[0]}:\n\n\"{audio_base_name}\"\n\n{ERROR_LOADING_FILE_TEXT[1]}:\n\n{message}')
-                    else:
-                        error_data = AUDIO_VERIFICATION_CHECK(i, message)
+        for input_file in audio_files:
+            try:
+                if not os.path.isfile(input_file):
+                    raise FileNotFoundError(f'Input file does not exist: {input_file}')
+                if isinstance(sample_path, str):
+                    self.create_sample(input_file, sample_path)
+                else:
+                    librosa.load(input_file, duration=3, mono=False, sr=44100)
+            except Exception as error:
+                is_good = False
+                error_name = type(error).__name__
+                traceback_text = ''.join(traceback.format_tb(error.__traceback__))
+                message = f'{error_name}: "{error}"\n{traceback_text}'
+                errors.append(AUDIO_VERIFICATION_CHECK(input_file, message))
+
+        error_data = ''.join(errors)
+        if errors and is_process:
+            self.error_log_var.set(error_data)
 
         if is_process:
             return is_good
+        return is_good, error_data
+
+    def verify_processing_inputs(self):
+        """Verify every selected input before starting model inference."""
+        if (
+            self.chosen_process_method_var.get() == AUDIO_TOOLS
+            and self.chosen_audio_tool_var.get() in (ALIGN_INPUTS, MATCH_INPUTS)
+        ):
+            if self.DualBatch_inputPaths:
+                inputs = [
+                    input_file
+                    for input_pair in self.DualBatch_inputPaths
+                    for input_file in input_pair
+                ]
+            else:
+                inputs = [
+                    self.fileOneEntry_Full_var.get(),
+                    self.fileTwoEntry_Full_var.get(),
+                ]
         else:
-            return is_good, error_data
+            inputs = list(self.inputPaths)
+
+        failures = []
+        total = len(inputs)
+        for index, input_file in enumerate(inputs, start=1):
+            self.conversion_Button_Text_var.set(f'Verifying Input {index}/{total}')
+            self.update_idletasks()
+            is_good, error_data = self.verify_audio(input_file, is_process=False)
+            if not is_good:
+                failures.append(error_data)
+
+        self.conversion_Button_Text_var.set(START_PROCESSING)
+        if not failures:
+            return True
+
+        self.error_log_var.set(''.join(failures))
+        messagebox.showerror(
+            parent=root,
+            title='Input Verification Failed',
+            message=(
+                f'{len(failures)} input file(s) could not be read. '
+                'Processing was stopped. Open the Error Log for details.'
+            ),
+        )
+        return False
       
     def create_sample(self, audio_file, sample_path=SAMPLE_CLIP_PATH):
         try:
@@ -2819,199 +2821,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         else:
             return tab1
 
-    def menu_view_inputs(self):
-                     
-        menu_view_inputs_top = tk.Toplevel(root)
-    
-        self.is_open_menu_view_inputs.set(True)
-        self.menu_view_inputs_close_window = lambda:close_window()
-        menu_view_inputs_top.protocol("WM_DELETE_WINDOW", self.menu_view_inputs_close_window)
-    
-        input_length_var = tk.StringVar(value='')   
-        input_info_text_var = tk.StringVar(value='')  
-        is_widen_box_var = tk.BooleanVar(value=False) 
-        is_play_file_var = tk.BooleanVar(value=False) 
-        varification_text_var = tk.StringVar(value=VERIFY_INPUTS_TEXT)
-
-        reset_list = lambda:(input_files_listbox_Option.delete(0, 'end'), [input_files_listbox_Option.insert(tk.END, inputs) for inputs in self.inputPaths])
-        audio_input_total = lambda:input_length_var.set(f'{AUDIO_INPUT_TOTAL_TEXT}: {len(self.inputPaths)}')
-        audio_input_total()
-
-        def list_diff(list1, list2): return list(set(list1).symmetric_difference(set(list2)))
-
-        def list_to_string(list1): return '\n'.join(''.join(sub) for sub in list1)
-
-        def close_window():
-            self.verification_thread.kill() if self.thread_check(self.verification_thread) else None
-            self.is_open_menu_view_inputs.set(False)
-            menu_view_inputs_top.destroy()
-
-        def drag_n_drop(e):
-            input_info_text_var.set('')
-            drop(e, accept_mode='files')
-            reset_list()
-            audio_input_total()
-            
-        def selected_files(is_remove=False):
-            if not self.thread_check(self.active_processing_thread):
-                items_list = [input_files_listbox_Option.get(i) for i in input_files_listbox_Option.curselection()]
-                inputPaths = list(self.inputPaths)# if is_remove else items_list
-                if is_remove:
-                    [inputPaths.remove(i) for i in items_list if items_list]
-                else:
-                    [inputPaths.remove(i) for i in self.inputPaths if i not in items_list]
-                removed_files = list_diff(self.inputPaths, inputPaths)
-                [input_files_listbox_Option.delete(input_files_listbox_Option.get(0, tk.END).index(i)) for i in removed_files]
-                starting_len = len(self.inputPaths)
-                self.inputPaths = tuple(inputPaths)
-                self.update_inputPaths()
-                audio_input_total()
-                input_info_text_var.set(f'{starting_len - len(self.inputPaths)} input(s) removed.')
-            else:
-                input_info_text_var.set('You cannot remove inputs during an active process.')
-            
-        def box_size():
-            input_info_text_var.set('')
-            input_files_listbox_Option.config(width=230, height=25) if is_widen_box_var.get() else input_files_listbox_Option.config(width=110, height=17)
-            self.menu_placement(menu_view_inputs_top, 'Selected Inputs', pop_up=True)
-
-        def input_options(is_select_inputs=True):
-            input_info_text_var.set('')
-            if is_select_inputs:
-                self.input_select_filedialog()
-            else:
-                self.inputPaths = ()
-            reset_list()
-            self.update_inputPaths()
-            audio_input_total()
-
-        def pop_open_file_path(is_play_file=False):
-            if self.inputPaths:
-                track_selected = self.inputPaths[input_files_listbox_Option.index(tk.ACTIVE)]
-                if os.path.isfile(track_selected):
-                    OPEN_FILE_func(track_selected if is_play_file else os.path.dirname(track_selected))
-        
-        def get_export_dir():
-            if os.path.isdir(self.export_path_var.get()):
-                export_dir = self.export_path_var.get()
-            else:
-                export_dir = self.export_select_filedialog()
-
-            return export_dir
-        
-        def verify_audio(is_create_samples=False):
-            inputPaths = list(self.inputPaths)
-            iterated_list = self.inputPaths if not is_create_samples else [input_files_listbox_Option.get(i) for i in input_files_listbox_Option.curselection()]
-            removed_files = []
-            export_dir = None
-            total_audio_count, current_file = len(iterated_list), 0
-            if iterated_list:
-                for i in iterated_list:
-                    current_file += 1
-                    input_info_text_var.set(f'{SAMPLE_BEGIN if is_create_samples else VERIFY_BEGIN}{current_file}/{total_audio_count}')
-                    if is_create_samples:
-                        export_dir = get_export_dir()
-                        if not export_dir:
-                            input_info_text_var.set('No export directory selected.')
-                            return
-                    is_good, error_data = self.verify_audio(i, is_process=False, sample_path=export_dir)
-                    if not is_good:
-                        inputPaths.remove(i)
-                        removed_files.append(error_data)#sample = self.create_sample(i)
-                        
-                varification_text_var.set(VERIFY_INPUTS_TEXT)
-                input_files_listbox_Option.configure(state=tk.NORMAL)
-                
-                if removed_files:
-                    input_info_text_var.set(f'{len(removed_files)} {BROKEN_OR_INCOM_TEXT}')
-                    error_text = ''
-                    for i in removed_files:
-                        error_text += i
-                    removed_files = list_diff(self.inputPaths, inputPaths)
-                    [input_files_listbox_Option.delete(input_files_listbox_Option.get(0, tk.END).index(i)) for i in removed_files]
-                    self.error_log_var.set(REMOVED_FILES(list_to_string(removed_files), error_text))
-                    self.inputPaths = tuple(inputPaths)
-                    self.update_inputPaths()
-                else:
-                    input_info_text_var.set('No errors found!')
-                    
-                audio_input_total()
-            else:
-                input_info_text_var.set(f'{NO_FILES_TEXT} {SELECTED_VER if is_create_samples else DETECTED_VER}')
-                varification_text_var.set(VERIFY_INPUTS_TEXT)
-                input_files_listbox_Option.configure(state=tk.NORMAL)
-                return
-            
-            audio_input_total()
-            
-        def verify_audio_start_thread(is_create_samples=False):
-            
-            if not self.thread_check(self.active_processing_thread):
-                if not self.thread_check(self.verification_thread):
-                    varification_text_var.set('Stop Progress')
-                    input_files_listbox_Option.configure(state=tk.DISABLED)
-                    self.verification_thread = KThread(target=lambda:verify_audio(is_create_samples=is_create_samples))
-                    self.verification_thread.start()
-                else:
-                    input_files_listbox_Option.configure(state=tk.NORMAL)
-                    varification_text_var.set(VERIFY_INPUTS_TEXT)
-                    input_info_text_var.set('Process Stopped')
-                    self.verification_thread.kill()
-            else:
-                input_info_text_var.set('You cannot verify inputs during an active process.')
-
-        def right_click_menu(event):
-                right_click_menu = tk.Menu(self, font=(MAIN_FONT_NAME, FONT_SIZE_1), tearoff=0)
-                right_click_menu.add_command(label='Remove Selected Items Only', command=lambda:selected_files(is_remove=True))
-                right_click_menu.add_command(label='Keep Selected Items Only', command=lambda:selected_files(is_remove=False))
-                right_click_menu.add_command(label='Clear All Input(s)', command=lambda:input_options(is_select_inputs=False))
-                right_click_menu.add_separator()
-                right_click_menu_sub = tk.Menu(right_click_menu, font=(MAIN_FONT_NAME, FONT_SIZE_1), tearoff=False)
-                right_click_menu.add_command(label='Verify and Create Samples of Selected Inputs', command=lambda:verify_audio_start_thread(is_create_samples=True))
-                right_click_menu.add_cascade(label='Preferred Double Click Action', menu=right_click_menu_sub)
-                if is_play_file_var.get():
-                    right_click_menu_sub.add_command(label='Enable: Open Audio File Directory', command=lambda:(input_files_listbox_Option.bind('<Double-Button>', lambda e:pop_open_file_path()), is_play_file_var.set(False)))
-                else:
-                    right_click_menu_sub.add_command(label='Enable: Open Audio File', command=lambda:(input_files_listbox_Option.bind('<Double-Button>', lambda e:pop_open_file_path(is_play_file=True)), is_play_file_var.set(True)))
-
-                try:
-                    right_click_menu.tk_popup(event.x_root,event.y_root)
-                    right_click_release_linux(right_click_menu, menu_view_inputs_top)
-                finally:
-                    right_click_menu.grab_release()
-
-        menu_view_inputs_Frame = self.menu_FRAME_SET(menu_view_inputs_top)
-        menu_view_inputs_Frame.grid(row=0)  
-
-        self.main_window_LABEL_SET(menu_view_inputs_Frame, SELECTED_INPUTS).grid(row=0,column=0,padx=0,pady=MENU_PADDING_1)
-        tk.Label(menu_view_inputs_Frame, textvariable=input_length_var, font=(MAIN_FONT_NAME, f"{FONT_SIZE_1}"), foreground=FG_COLOR).grid(row=1, column=0, padx=0, pady=MENU_PADDING_1)
-        if not OPERATING_SYSTEM == "Linux":
-            ttk.Button(menu_view_inputs_Frame, text=SELECT_INPUTS, command=lambda:input_options()).grid(row=2,column=0,padx=0,pady=MENU_PADDING_2)
-        input_files_listbox_Option = tk.Listbox(menu_view_inputs_Frame, selectmode=tk.EXTENDED, activestyle='dotbox', font=(MAIN_FONT_NAME, f"{FONT_SIZE_1}"), background='#101414', exportselection=0, width=110, height=17, relief=tk.SOLID, borderwidth=0)
-        input_files_listbox_vertical_scroll = ttk.Scrollbar(menu_view_inputs_Frame, orient=tk.VERTICAL)
-        input_files_listbox_Option.config(yscrollcommand=input_files_listbox_vertical_scroll.set)
-        input_files_listbox_vertical_scroll.configure(command=input_files_listbox_Option.yview)
-        input_files_listbox_Option.grid(row=4, sticky=tk.W)
-        input_files_listbox_vertical_scroll.grid(row=4, column=1, sticky=tk.NS)
-
-        tk.Label(menu_view_inputs_Frame, textvariable=input_info_text_var, font=(MAIN_FONT_NAME, f"{FONT_SIZE_1}"), foreground=FG_COLOR).grid(row=5, column=0, padx=0, pady=0)
-        ttk.Checkbutton(menu_view_inputs_Frame, text=WIDEN_BOX, variable=is_widen_box_var, command=lambda:box_size()).grid(row=6,column=0,padx=0,pady=0)
-        verify_audio_Button = ttk.Button(menu_view_inputs_Frame, textvariable=varification_text_var, command=lambda:verify_audio_start_thread())
-        verify_audio_Button.grid(row=7,column=0,padx=0,pady=MENU_PADDING_1)
-        ttk.Button(menu_view_inputs_Frame, text=CLOSE_WINDOW, command=lambda:menu_view_inputs_top.destroy()).grid(row=8,column=0,padx=0,pady=MENU_PADDING_1)
-
-        if is_dnd_compatible:
-            menu_view_inputs_top.drop_target_register(DND_FILES)
-            menu_view_inputs_top.dnd_bind('<<Drop>>', lambda e: drag_n_drop(e))
-        input_files_listbox_Option.bind(right_click_button, lambda e:right_click_menu(e))
-        input_files_listbox_Option.bind('<Double-Button>', lambda e:pop_open_file_path())
-        input_files_listbox_Option.bind('<Delete>', lambda e:selected_files(is_remove=True))
-        input_files_listbox_Option.bind('<BackSpace>', lambda e:selected_files(is_remove=False))
-
-        reset_list()
-
-        self.menu_placement(menu_view_inputs_top, 'Selected Inputs', pop_up=True)
-
     def menu_batch_dual(self):
         menu_batch_dual_top = tk.Toplevel(root)
         
@@ -3098,13 +2907,13 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             self.check_dual_paths()
             menu_batch_dual_top.destroy()
 
-        menu_view_inputs_Frame = self.menu_FRAME_SET(menu_batch_dual_top)
-        menu_view_inputs_Frame.grid(row=0)
+        batch_dual_frame = self.menu_FRAME_SET(menu_batch_dual_top)
+        batch_dual_frame.grid(row=0)
         
-        left_frame = ListboxBatchFrame(menu_view_inputs_Frame, self.file_one_sub_var.get().title(), move_entry, self.right_img, self.img_mapper)
+        left_frame = ListboxBatchFrame(batch_dual_frame, self.file_one_sub_var.get().title(), move_entry, self.right_img, self.img_mapper)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
-        right_frame = ListboxBatchFrame(menu_view_inputs_Frame, self.file_two_sub_var.get().title(), lambda:move_entry(False), self.left_img, self.img_mapper)
+        right_frame = ListboxBatchFrame(batch_dual_frame, self.file_two_sub_var.get().title(), lambda:move_entry(False), self.left_img, self.img_mapper)
         right_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
 
         left_frame.listbox.drop_target_register(DND_FILES)
@@ -3114,13 +2923,13 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         left_frame.listbox.dnd_bind(right_click_button, lambda e: clear_all(e, FILE_1_LB))
         right_frame.listbox.dnd_bind(right_click_button, lambda e: clear_all(e, FILE_2_LB))
 
-        menu_view_inputs_bottom_Frame = self.menu_FRAME_SET(menu_batch_dual_top)
-        menu_view_inputs_bottom_Frame.grid(row=1)
+        batch_dual_buttons = self.menu_FRAME_SET(menu_batch_dual_top)
+        batch_dual_buttons.grid(row=1)
         
-        confirm_btn = ttk.Button(menu_view_inputs_bottom_Frame, text=CONFIRM_ENTRIES, command=gather_input_list)
+        confirm_btn = ttk.Button(batch_dual_buttons, text=CONFIRM_ENTRIES, command=gather_input_list)
         confirm_btn.grid(pady=MENU_PADDING_1)
         
-        close_btn = ttk.Button(menu_view_inputs_bottom_Frame, text=CLOSE_WINDOW, command=lambda:menu_batch_dual_top.destroy())
+        close_btn = ttk.Button(batch_dual_buttons, text=CLOSE_WINDOW, command=lambda:menu_batch_dual_top.destroy())
         close_btn.grid(pady=MENU_PADDING_1)
 
         if self.check_dual_paths():
@@ -5988,18 +5797,21 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         saved_ensemble_path = os.path.join(ENSEMBLE_CACHE_DIR, f'{saved_ensemble}.json')
 
         if os.path.isfile(saved_ensemble_path):
-            saved_data = json.load(open(saved_ensemble_path))
+            with open(saved_ensemble_path, encoding='utf-8') as ensemble_file:
+                saved_data = json.load(ensemble_file)
             
         if saved_data:
             self.selection_action_ensemble_stems(saved_data['ensemble_main_stem'], from_menu=False)
             self.ensemble_main_stem_var.set(saved_data['ensemble_main_stem'])
             self.ensemble_type_var.set(saved_data['ensemble_type'])
-            self.saved_model_list = saved_data['selected_models']
-        
-            for saved_model in self.saved_model_list:         
-                status = self.assemble_model_data(saved_model, ENSEMBLE_CHECK)[0].model_status
-                if not status:
-                    self.saved_model_list.remove(saved_model)
+            self.saved_model_list = [
+                saved_model
+                for saved_model in saved_data['selected_models']
+                if self.assemble_model_data(
+                    saved_model,
+                    ENSEMBLE_CHECK,
+                )[0].model_status
+            ]
             
             indexes = self.ensemble_listbox_get_indexes_for_files(self.model_stems_list, self.saved_model_list)
             
@@ -6176,6 +5988,9 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             self.error_dialoge(INVALID_EXPORT)
             return
 
+        if not self.verify_processing_inputs():
+            return
+
         if not self.process_storage_check():
             return
 
@@ -6263,16 +6078,23 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
     def process_tool_start(self):
         """Start the conversion for all the given mp3 and wav files"""
 
+        output_timestamp = datetime.now()
+
         def time_elapsed():
             return f'Time Elapsed: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - stime)))}'
 
-        def get_audio_file_base(audio_file):
+        def get_audio_file_base(audio_file, file_num):
             if audio_tool.audio_tool == MANUAL_ENSEMBLE:
-                return f'{os.path.splitext(os.path.basename(inputPaths[0]))[0]}'
+                source_path = inputPaths[0]
             elif audio_tool.audio_tool in [ALIGN_INPUTS, MATCH_INPUTS]:
-                return f'{os.path.splitext(os.path.basename(audio_file[0]))[0]}'
+                source_path = audio_file[0]
             else:
-                return f'{os.path.splitext(os.path.basename(audio_file))[0]}'
+                source_path = audio_file
+            return clean_output_base(
+                source_path,
+                output_timestamp,
+                file_num if len(inputPaths) > 1 else None,
+            )
 
         def handle_ensemble(inputPaths, audio_file_base):
             self.progress_bar_main_var.set(50)
@@ -6345,7 +6167,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             for file_num, audio_file in enumerate(inputPaths, start=1):
                 self.iteration += 1
                 base = (100 / total_files)
-                audio_file_base = get_audio_file_base(audio_file)
+                audio_file_base = get_audio_file_base(audio_file, file_num)
                 self.base_text = self.process_get_baseText(total_files=total_files, file_num=total_files if multiple_files else file_num, is_dual=is_dual)
                 command_Text = lambda text: self.command_Text.write(self.base_text + text)
 
@@ -6521,6 +6343,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         """Start the conversion for all the given mp3 and wav files"""
         
         stime = time.perf_counter()
+        output_timestamp = datetime.now()
         time_elapsed = lambda:f'Time Elapsed: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - stime)))}'
         export_path = self.export_path_var.get()
         is_ensemble = False
@@ -6554,6 +6377,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             for file_num, audio_file in enumerate(inputPaths, start=1):
                 self.cached_sources_clear()
                 base_text = self.process_get_baseText(total_files=inputPath_total_len, file_num=file_num)
+                original_audio_file = audio_file
 
                 if self.verify_audio(audio_file):
                     audio_file = self.create_sample(audio_file) if is_model_sample_mode else audio_file
@@ -6565,6 +6389,12 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     self.iteration += self.true_model_count
                     is_verified_audio = False
                     continue
+
+                audio_file_base = clean_output_base(
+                    original_audio_file,
+                    output_timestamp,
+                    file_num if inputPath_total_len > 1 else None,
+                )
 
                 for current_model_num, current_model in enumerate(model, start=1):
                     self.iteration += 1
@@ -6578,11 +6408,10 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     set_progress_bar = lambda step, inference_iterations=0:self.process_update_progress(total_files=inputPath_total_len, step=(step + (inference_iterations)))
                     write_to_console = lambda progress_text, base_text=base_text:self.command_Text.write(base_text + progress_text)
 
-                    audio_file_base = f"{file_num}_{os.path.splitext(os.path.basename(audio_file))[0]}"
-                    audio_file_base = audio_file_base if not self.is_testing_audio_var.get() or is_ensemble else f"{round(time.time())}_{audio_file_base}"
-                    audio_file_base = audio_file_base if not is_ensemble else f"{audio_file_base}_{current_model.model_basename}"
+                    model_audio_file_base = audio_file_base if not self.is_testing_audio_var.get() or is_ensemble else f"{round(time.time())}_{audio_file_base}"
+                    model_audio_file_base = model_audio_file_base if not is_ensemble else f"{model_audio_file_base}_{current_model.model_basename}"
                     if not is_ensemble:
-                        audio_file_base = audio_file_base if not self.is_add_model_name_var.get() else f"{audio_file_base}_{current_model.model_basename}"
+                        model_audio_file_base = model_audio_file_base if not self.is_add_model_name_var.get() else f"{model_audio_file_base}_{current_model.model_basename}"
 
                     if self.is_create_model_folder_var.get() and not is_ensemble:
                         export_path = os.path.join(Path(self.export_path_var.get()), current_model.model_basename, os.path.splitext(os.path.basename(audio_file))[0])
@@ -6591,7 +6420,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     process_data = {
                                     'model_data': current_model, 
                                     'export_path': export_path,
-                                    'audio_file_base': audio_file_base,
+                                    'audio_file_base': model_audio_file_base,
                                     'audio_file': audio_file,
                                     'set_progress_bar': set_progress_bar,
                                     'write_to_console': write_to_console,
@@ -6616,7 +6445,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
 
                 if is_ensemble:
                     
-                    audio_file_base = audio_file_base.replace(f"_{current_model.model_basename}","")
                     self.command_Text.write(base_text + ENSEMBLING_OUTPUTS)
                     
                     if self.ensemble_main_stem_var.get() in [FOUR_STEM_ENSEMBLE, MULTI_STEM_ENSEMBLE]:

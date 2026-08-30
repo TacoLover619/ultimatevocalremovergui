@@ -32,6 +32,7 @@ from lib_v5.vr_network.model_param_init import ModelParameters
 from pathlib import Path
 from gui_data.constants import *
 from gui_data.error_handling import *
+from gui_data.output_naming import stem_output_filename
 from scipy import signal
 import audioread
 import gzip
@@ -73,6 +74,14 @@ def clear_gpu_cache():
         torch.mps.empty_cache()
     else:
         torch.cuda.empty_cache()
+
+
+def pad_audio_boundaries(mix, left, right):
+    """Pad audio with mirrored context so inference does not fade clip edges."""
+    if left < 0 or right < 0:
+        raise ValueError('Audio padding cannot be negative')
+    mode = 'reflect' if mix.shape[-1] > 1 else 'edge'
+    return np.pad(mix, ((0, 0), (left, right)), mode=mode)
 
 warnings.filterwarnings("ignore")
 cpu = torch.device('cpu')
@@ -477,6 +486,15 @@ class SeperateAttributes:
         self.write_audio(stem_path, source, samplerate, stem_name=stem_name)
         
         return {stem_name: source}
+
+    def stem_output_path(self, stem_name):
+        """Return a clean filename when processing is configured for one stem only."""
+        filename = stem_output_filename(
+            self.audio_file_base,
+            stem_name,
+            single_stem=self.is_primary_stem_only or self.is_secondary_stem_only,
+        )
+        return os.path.join(self.export_path, filename)
     
     def write_audio(self, stem_path: str, stem_source, samplerate, stem_name=None):
         
@@ -607,7 +625,7 @@ class SeperateMDX(SeperateAttributes):
             self.secondary_source_primary, self.secondary_source_secondary = process_secondary_model(self.secondary_model, self.process_data, main_process_method=self.process_method, main_model_primary=self.primary_stem)
         
         if not self.is_primary_stem_only:
-            secondary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.secondary_stem}).wav')
+            secondary_stem_path = self.stem_output_path(self.secondary_stem)
             if not isinstance(self.secondary_source, np.ndarray):
                 raw_mix = self.demix(self.match_frequency_pitch(mix), is_match_mix=True) if mdx_net_cut else self.match_frequency_pitch(mix)
                 self.secondary_source = spec_utils.invert_stem(raw_mix, source) if self.is_invert_spec else mix.T-source.T
@@ -615,7 +633,7 @@ class SeperateMDX(SeperateAttributes):
             self.secondary_source_map = self.final_process(secondary_stem_path, self.secondary_source, self.secondary_source_secondary, self.secondary_stem, samplerate)
         
         if not self.is_secondary_stem_only:
-            primary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.primary_stem}).wav')
+            primary_stem_path = self.stem_output_path(self.primary_stem)
 
             if not isinstance(self.primary_source, np.ndarray):
                 self.primary_source = source.T
@@ -657,7 +675,7 @@ class SeperateMDX(SeperateAttributes):
         gen_size = chunk_size-2*self.trim
 
         pad = gen_size + self.trim - ((mix.shape[-1]) % gen_size)
-        mixture = np.concatenate((np.zeros((2, self.trim), dtype='float32'), mix, np.zeros((2, pad), dtype='float32')), 1)
+        mixture = pad_audio_boundaries(mix, self.trim, pad)
 
         step = self.chunk_size - self.n_fft if overlap == DEFAULT else int((1 - overlap) * chunk_size)
         result = np.zeros((1, 2, mixture.shape[-1]), dtype=np.float32)
@@ -792,7 +810,7 @@ class SeperateMDXC(SeperateAttributes):
                                                                                                          main_model_primary=self.primary_stem)
 
             if not self.is_primary_stem_only:
-                secondary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.secondary_stem}).wav')
+                secondary_stem_path = self.stem_output_path(self.secondary_stem)
                 if not isinstance(self.secondary_source, np.ndarray):
                     
                     if self.is_mdx_combine_stems and len(stem_list) >= 2:
@@ -818,7 +836,7 @@ class SeperateMDXC(SeperateAttributes):
                 self.secondary_source_map = self.final_process(secondary_stem_path, self.secondary_source, self.secondary_source_secondary, self.secondary_stem, samplerate)    
 
             if not self.is_secondary_stem_only:
-                primary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.primary_stem}).wav')
+                primary_stem_path = self.stem_output_path(self.primary_stem)
                 if not isinstance(self.primary_source, np.ndarray):
                     self.primary_source = source_primary.T
 
@@ -857,7 +875,10 @@ class SeperateMDXC(SeperateAttributes):
         hop_size = chunk_size // overlap
         mix_shape = mix.shape[1]
         pad_size = hop_size - (mix_shape - chunk_size) % hop_size
-        mix = torch.cat([torch.zeros(2, chunk_size - hop_size), mix, torch.zeros(2, pad_size + chunk_size - hop_size)], 1)
+        left_pad = chunk_size - hop_size
+        right_pad = pad_size + chunk_size - hop_size
+        padded_mix = pad_audio_boundaries(mix.numpy(), left_pad, right_pad)
+        mix = torch.from_numpy(padded_mix)
 
         chunks = mix.unfold(1, chunk_size, hop_size).transpose(0, 1)
         batches = [chunks[i : i + batch_size] for i in range(0, len(chunks), batch_size)]
@@ -1063,7 +1084,7 @@ class SeperateDemucs(SeperateAttributes):
                     secondary_save(f"{self.secondary_stem} {INST_STEM}", source, raw_mixture=inst_mix, is_inst_mixture=True)
 
             if not self.is_secondary_stem_only:
-                primary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.primary_stem}).wav')
+                primary_stem_path = self.stem_output_path(self.primary_stem)
                 if not isinstance(self.primary_source, np.ndarray):
                     self.primary_source = source[self.demucs_source_map[self.primary_stem]].T
                 
@@ -1169,7 +1190,7 @@ class SeperateVR(SeperateAttributes):
             self.secondary_source_primary, self.secondary_source_secondary = process_secondary_model(self.secondary_model, self.process_data, main_process_method=self.process_method, main_model_primary=self.primary_stem)
 
         if not self.is_secondary_stem_only:
-            primary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.primary_stem}).wav')
+            primary_stem_path = self.stem_output_path(self.primary_stem)
             if not isinstance(self.primary_source, np.ndarray):
                 self.primary_source = self.spec_to_wav(y_spec).T
                 if not self.model_samplerate == 44100:
@@ -1178,7 +1199,7 @@ class SeperateVR(SeperateAttributes):
             self.primary_source_map = self.final_process(primary_stem_path, self.primary_source, self.secondary_source_primary, self.primary_stem, 44100)  
 
         if not self.is_primary_stem_only:
-            secondary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.secondary_stem}).wav')
+            secondary_stem_path = self.stem_output_path(self.secondary_stem)
             if not isinstance(self.secondary_source, np.ndarray):
                 self.secondary_source = self.spec_to_wav(v_spec).T
                 if not self.model_samplerate == 44100:
@@ -1318,7 +1339,21 @@ class SeperateVR(SeperateAttributes):
             
         return wav
 
-def process_secondary_model(secondary_model: ModelData, 
+def create_separator(model_data: ModelData, process_data, **kwargs):
+    """Create the separator for a model without duplicating dispatch logic."""
+    if model_data.process_method == VR_ARCH_TYPE:
+        separator_class = SeperateVR
+    elif model_data.process_method == MDX_ARCH_TYPE:
+        separator_class = SeperateMDXC if model_data.is_mdx_c else SeperateMDX
+    elif model_data.process_method == DEMUCS_ARCH_TYPE:
+        separator_class = SeperateDemucs
+    else:
+        raise ValueError(f'Unsupported process method: {model_data.process_method!r}')
+
+    return separator_class(model_data, process_data, **kwargs)
+
+
+def process_secondary_model(secondary_model: ModelData,
                             process_data, 
                             main_model_primary_stem_4_stem=None, 
                             is_source_load=False, 
@@ -1331,17 +1366,15 @@ def process_secondary_model(secondary_model: ModelData,
         process_iteration = process_data['process_iteration']
         process_iteration()
     
-    if secondary_model.process_method == VR_ARCH_TYPE:
-        seperator = SeperateVR(secondary_model, process_data, main_model_primary_stem_4_stem=main_model_primary_stem_4_stem, main_process_method=main_process_method, main_model_primary=main_model_primary)
-    if secondary_model.process_method == MDX_ARCH_TYPE:
-        if secondary_model.is_mdx_c:
-            seperator = SeperateMDXC(secondary_model, process_data, main_model_primary_stem_4_stem=main_model_primary_stem_4_stem, main_process_method=main_process_method, is_return_dual=is_return_dual, main_model_primary=main_model_primary)
-        else:
-            seperator = SeperateMDX(secondary_model, process_data, main_model_primary_stem_4_stem=main_model_primary_stem_4_stem, main_process_method=main_process_method, main_model_primary=main_model_primary)
-    if secondary_model.process_method == DEMUCS_ARCH_TYPE:
-        seperator = SeperateDemucs(secondary_model, process_data, main_model_primary_stem_4_stem=main_model_primary_stem_4_stem, main_process_method=main_process_method, is_return_dual=is_return_dual, main_model_primary=main_model_primary)
-        
-    secondary_sources = seperator.seperate()
+    separator = create_separator(
+        secondary_model,
+        process_data,
+        main_model_primary_stem_4_stem=main_model_primary_stem_4_stem,
+        main_process_method=main_process_method,
+        is_return_dual=is_return_dual,
+        main_model_primary=main_model_primary,
+    )
+    secondary_sources = separator.seperate()
 
     if type(secondary_sources) is dict and not is_source_load and not is_pre_proc_model:
         return gather_sources(secondary_model.primary_model_primary_stem, secondary_stem(secondary_model.primary_model_primary_stem), secondary_sources)
@@ -1364,17 +1397,14 @@ def process_chain_model(secondary_model: ModelData,
     
     vocal_stem_path = [vocal_source, os.path.splitext(os.path.basename(vocal_stem_path))[0]]
 
-    if secondary_model.process_method == VR_ARCH_TYPE:
-        seperator = SeperateVR(secondary_model, process_data, vocal_stem_path=vocal_stem_path, master_inst_source=master_inst_source, master_vocal_source=master_vocal_source)
-    if secondary_model.process_method == MDX_ARCH_TYPE:
-        if secondary_model.is_mdx_c:
-            seperator = SeperateMDXC(secondary_model, process_data, vocal_stem_path=vocal_stem_path, master_inst_source=master_inst_source, master_vocal_source=master_vocal_source)
-        else:
-            seperator = SeperateMDX(secondary_model, process_data, vocal_stem_path=vocal_stem_path, master_inst_source=master_inst_source, master_vocal_source=master_vocal_source)
-    if secondary_model.process_method == DEMUCS_ARCH_TYPE:
-        seperator = SeperateDemucs(secondary_model, process_data, vocal_stem_path=vocal_stem_path, master_inst_source=master_inst_source, master_vocal_source=master_vocal_source)
-        
-    secondary_sources = seperator.seperate()
+    separator = create_separator(
+        secondary_model,
+        process_data,
+        vocal_stem_path=vocal_stem_path,
+        master_inst_source=master_inst_source,
+        master_vocal_source=master_vocal_source,
+    )
+    secondary_sources = separator.seperate()
     
     if type(secondary_sources) is dict:
         return secondary_sources
@@ -1444,32 +1474,33 @@ def output_path_for_format(audio_path, output_format):
     return f'{path_without_extension}.{output_format.lower()}'
 
 
-def save_format(audio_path, save_format, mp3_bit_set):
+def save_format(audio_path, output_format, mp3_bit_set):
+    if output_format == WAV:
+        return audio_path
+    if output_format not in (FLAC, MP3):
+        raise ValueError(f'Unsupported output format: {output_format!r}')
 
-    if not save_format == WAV:
+    if OPERATING_SYSTEM == 'Darwin':
+        ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
+        pydub.AudioSegment.converter = ffmpeg_path
 
-        if OPERATING_SYSTEM == 'Darwin':
-            FFMPEG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
-            pydub.AudioSegment.converter = FFMPEG_PATH
+    audio = pydub.AudioSegment.from_wav(audio_path)
+    converted_path = output_path_for_format(audio_path, output_format)
 
-        musfile = pydub.AudioSegment.from_wav(audio_path)
-
-        if save_format == FLAC:
-            audio_path_flac = output_path_for_format(audio_path, FLAC)
-            musfile.export(audio_path_flac, format="flac")
-
-        if save_format == MP3:
-            audio_path_mp3 = output_path_for_format(audio_path, MP3)
-            try:
-                musfile.export(audio_path_mp3, format="mp3", bitrate=mp3_bit_set, codec="libmp3lame")
-            except Exception as e:
-                print(e)
-                musfile.export(audio_path_mp3, format="mp3", bitrate=mp3_bit_set)
-        
+    if output_format == FLAC:
+        audio.export(converted_path, format='flac')
+    else:
         try:
-            os.remove(audio_path)
-        except Exception as e:
-            print(e)
+            audio.export(converted_path, format='mp3', bitrate=mp3_bit_set, codec='libmp3lame')
+        except Exception as error:
+            print(error)
+            audio.export(converted_path, format='mp3', bitrate=mp3_bit_set)
+
+    try:
+        os.remove(audio_path)
+    except OSError as error:
+        print(f'Unable to remove temporary WAV file "{audio_path}": {error}')
+    return converted_path
             
 def pitch_shift(mix):
     new_sr = 31183

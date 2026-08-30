@@ -479,7 +479,6 @@ MDX_MENU ='MDX-Net Menu'
 ENSEMBLE_MENU ='Ensemble Menu'
 HELP_MENU ='Help Menu'
 ERROR_MENU ='Error Log'
-INPUTS_MENU ='Inputs Menu'
 ALIGN_MENU ='Align Menu'
 
 # Audio Player
@@ -1131,12 +1130,12 @@ OUTPUT_FOLDER_ENTRY_HELP = (
     'Choose the directory where the processed files will be saved.'
 )
 INPUT_FOLDER_BUTTON_HELP = (
-    'Open Input Folder Button:\n'
-    'Open the directory containing the selected input audio file(s).'
+    'Select Input Audio Button:\n'
+    'Choose the audio file(s) to process.'
 )
 OUTPUT_FOLDER_BUTTON_HELP = (
-    'Open Output Folder Button:\n'
-    'Open the selected output folder.'
+    'Select Output Folder Button:\n'
+    'Click to browse and select the output folder.'
 )
 CHOOSE_MODEL_HELP = (
     'Each processing method has its own set of options and models.\n'
@@ -1295,7 +1294,7 @@ EXIT_DOWNLOAD_ERROR = 'Active Download', 'Please stop the download or wait for i
 SET_TO_DEFAULT_PROCESS_ERROR = 'Active Process', 'You cannot reset all of the application settings during an active process.'
 SET_TO_ANY_PROCESS_ERROR = 'Active Process', 'You cannot reset the application settings during an active process.'
 RESET_ALL_TO_DEFAULT_WARNING = 'Reset Settings Confirmation', 'All application settings will be set to factory default.\n\nAre you sure you wish to continue?'
-AUDIO_VERIFICATION_CHECK = lambda i, e:f'++++++++++++++++++++++++++++++++++++++++++++++++++++\n\nBroken File Removed: \n\n{i}\n\nError Details:\n\n{e}\n++++++++++++++++++++++++++++++++++++++++++++++++++++'
+AUDIO_VERIFICATION_CHECK = lambda i, e:f'++++++++++++++++++++++++++++++++++++++++++++++++++++\n\nInvalid Audio File: \n\n{i}\n\nError Details:\n\n{e}\n++++++++++++++++++++++++++++++++++++++++++++++++++++'
 INVALID_ONNX_MODEL_ERROR = 'Invalid Model', 'The file selected is not a valid MDX-Net model. Please see the error log for more information.'
 INVALID_PARAM_MODEL_ERROR = 'Select Model Param', 'Please choose a model param or click \'Cancel\'.'
 UNRECOGNIZED_MODEL = 'Unrecognized Model Detected', ' is an unrecognized model.\n\n' + \
@@ -1530,8 +1529,8 @@ BATCH_PROCESS_MENU_TEXT = 'Batch Process Menu'
 TEMP_FILE_DELETION_TEXT = 'Temp File Deletion'
 VOCAL_SPLITTER_OPTIONS_TEXT = 'Vocal Splitter Options'
 WAVEFORM_ENSEMBLE_TEXT = 'Waveform Ensemble'
-SELECT_INPUT_TEXT = 'Select Input'
-SELECT_OUTPUT_TEXT = 'Select Output'
+SELECT_INPUT_TEXT = 'Select Input Audio'
+SELECT_OUTPUT_TEXT = 'Select Output Folder'
 TIME_CORRECTION_TEXT = 'Time Correction'
 UVR_LIS_INFO_TEXT = 'UVR License Information'
 ADDITIONAL_RES_CREDITS_TEXT = 'Additional Resources & Credits'
