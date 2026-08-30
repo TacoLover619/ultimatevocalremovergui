@@ -38,7 +38,6 @@ a = Analysis(
         'torch._dynamo',
         'torch._inductor',
         'torch.distributed.elastic',
-        'torch.testing',
         'torch.utils.benchmark',
         'torch.utils.tensorboard',
     ],

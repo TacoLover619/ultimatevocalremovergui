@@ -144,7 +144,6 @@ class CoreCompatibilityTests(unittest.TestCase):
         for module_name in (
             'torch._dynamo',
             'torch._inductor',
-            'torch.testing',
             'torch.utils.benchmark',
             'torch.utils.tensorboard',
         ):
