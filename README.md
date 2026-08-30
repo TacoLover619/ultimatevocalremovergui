@@ -1,7 +1,5 @@
 # Ultimate Vocal Remover GUI v6.0
 
-<img src="https://raw.githubusercontent.com/Anjok07/ultimatevocalremovergui/master/gui_data/img/UVR_v5.6.png?raw=true" />
-
 [![Release](https://img.shields.io/github/release/TacoLover619/ultimatevocalremovergui.svg)](https://github.com/TacoLover619/ultimatevocalremovergui/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/TacoLover619/ultimatevocalremovergui/total.svg)](https://github.com/TacoLover619/ultimatevocalremovergui/releases)
 
@@ -448,49 +446,20 @@ These bundles contain the UVR interface, Python, PyTorch, and other dependencies
     - [`UVR_v6.0.0_setup-1.bin`](https://github.com/TacoLover619/ultimatevocalremovergui/releases/download/v6.0.0/UVR_v6.0.0_setup-1.bin)
     - [`UVR_v6.0.0_setup-2.bin`](https://github.com/TacoLover619/ultimatevocalremovergui/releases/download/v6.0.0/UVR_v6.0.0_setup-2.bin)
     - [`SHA256SUMS.txt`](https://github.com/TacoLover619/ultimatevocalremovergui/releases/download/v6.0.0/SHA256SUMS.txt)
-- If you use an **AMD Radeon or Intel Arc graphics card**, you can try the DirectML version:
-    - [DirectML Version - Main Download Link](https://github.com/Anjok07/ultimatevocalremovergui/releases/download/v5.6/UVR_1_15_25_22_30_BETA_full.exe)
-- Update Package instructions for those who have UVR already installed:
-    - If you already have UVR installed you can install this package over it or download it straight from the application or [click here for the patch](https://github.com/Anjok07/ultimatevocalremovergui/releases/download/v5.6/UVR_Patch_10_6_23_4_27.exe).
+- Before installing, confirm that the setup filename is
+  `UVR_v6.0.0_setup.exe`. Its SHA-256 value is:
 
-<details id="WindowsManual">
-  <summary>Windows Manual Installation</summary>
+  ```text
+  D0EAA630C68A8BA8F29C3EE5356A5587382FCF2DFB703776C2E0FFBF37B1EB91
+  ```
 
-### Manual Windows Installation
-
-- Download and extract the repository [here](https://github.com/Anjok07/ultimatevocalremovergui/archive/refs/heads/master.zip)
-- Download and install Python [here](https://www.python.org/ftp/python/3.9.8/python-3.9.8-amd64.exe)
-   - Make sure to check "Add python.exe to PATH" during the install
-- Run the following commands from the extracted repo directory:
-
-```
-python.exe -m pip install -r requirements.txt
-```
-
-If you have a compatible Nvidia GPU, run the following command:
-
-```
-python.exe -m pip install --upgrade torch --extra-index-url https://download.pytorch.org/whl/cu117
-```
-
-If you do not have FFmpeg or Rubber Band installed and want to avoid going through the process of installing them the long way, follow the instructions below.
-
-**FFmpeg Installation**
-
-- Download the precompiled build [here](https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip)
-- From the archive, extract the following file to the UVR application directory:
-   - ```ffmpeg-5.1.2-essentials_build/bin/ffmpeg.exe```
-
-**Rubber Band Installation**
-
-In order to use the Time Stretch or Change Pitch tool, you'll need Rubber Band.
-
-- Download the precompiled build [here](https://breakfastquay.com/files/releases/rubberband-3.1.2-gpl-executable-windows.zip)
-- From the archive, extract the following files to the UVR application directory:
-   - ```rubberband-3.1.2-gpl-executable-windows/rubberband.exe```
-   - ```rubberband-3.1.2-gpl-executable-windows/sndfile.dll```
-
-</details>
+- The installer window must say `Setup - Ultimate Vocal Remover v6.0.0`. If it
+  says version 5.6.1, cancel it because that is an older installer and is not
+  part of this release.
+- The old v5.6 DirectML installer and v5.6 patch links have been removed from
+  this Windows section to prevent them from being mistaken for v6.0 downloads.
+- To build from source, follow the complete
+  [Windows build procedure](#reproducible-windows-packaging) on this page.
 
 ### MacOS Installation
 - Please Note:

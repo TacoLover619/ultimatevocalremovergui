@@ -19,6 +19,15 @@ Download all three files into the same folder. Do not rename them. Run
 `UVR_v6.0.0_setup.exe`; the setup program reads both numbered data files
 automatically. `SHA256SUMS.txt` is provided for integrity verification.
 
+The installer window must say `Setup - Ultimate Vocal Remover v6.0.0`. If it
+says version 5.6.1, cancel the installation. That is an older setup package and
+is not one of the files attached to this release. The SHA-256 value for the v6.0
+setup EXE is:
+
+```text
+D0EAA630C68A8BA8F29C3EE5356A5587382FCF2DFB703776C2E0FFBF37B1EB91
+```
+
 The installer is 64-bit, targets Windows 10 build 17763 or newer (including
 Windows 11), installs per user by default, creates a Start Menu entry, offers an
 optional Desktop shortcut, and registers a normal Windows uninstaller. No
