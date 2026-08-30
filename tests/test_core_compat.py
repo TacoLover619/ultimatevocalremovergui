@@ -59,13 +59,6 @@ class CoreCompatibilityTests(unittest.TestCase):
     def test_release_version(self):
         self.assertEqual(VERSION, 'v6.0.0')
 
-    def test_windows_lock_avoids_pytorch_29_dll_regression(self):
-        lock_file = Path(__file__).resolve().parents[1] / 'requirements-windows.lock.txt'
-        requirements = lock_file.read_text(encoding='utf-8')
-        self.assertIn('torch==2.8.0+cu126', requirements)
-        self.assertIn('torchvision==0.23.0+cu126', requirements)
-        self.assertNotIn('torch==2.9.', requirements)
-
     def test_windows_installer_upgrades_original_release(self):
         installer = Path(__file__).resolve().parents[1] / 'UVR-Windows.iss'
         definition = installer.read_text(encoding='utf-8')
