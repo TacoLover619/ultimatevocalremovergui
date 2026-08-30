@@ -1366,10 +1366,13 @@ def prepare_mix(mix):
     else:
         if mix.ndim > 2:
             raise ValueError('Audio arrays must be one-dimensional or two-dimensional')
-        if mix.ndim == 2 and not (
-            mix.shape[0] in (1, 2) and mix.shape[1] > mix.shape[0]
-        ):
-            mix = mix.T
+        if mix.ndim == 2:
+            if mix.shape[0] in (1, 2):
+                pass
+            elif mix.shape[1] in (1, 2):
+                mix = mix.T
+            else:
+                raise ValueError('Audio arrays must contain one or two channels')
 
     if isinstance(audio_path, str):
         if not np.any(mix) and audio_path.lower().endswith('.mp3'):

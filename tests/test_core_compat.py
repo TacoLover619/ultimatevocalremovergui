@@ -186,6 +186,24 @@ class CoreCompatibilityTests(unittest.TestCase):
         self.assertEqual(prepared.shape, (2, 100))
         np.testing.assert_array_equal(prepared[0], prepared[1])
 
+    def test_prepare_mix_preserves_very_short_channel_first_audio(self):
+        stereo = np.array([[0.25], [-0.25]], dtype=np.float32)
+
+        prepared = prepare_mix(stereo)
+
+        self.assertEqual(prepared.shape, (2, 1))
+        np.testing.assert_array_equal(prepared, stereo)
+
+    def test_prepare_mix_rejects_unsupported_channel_counts(self):
+        for audio in (
+            np.ones((3, 100), dtype=np.float32),
+            np.ones((100, 3), dtype=np.float32),
+            np.ones((2, 3, 100), dtype=np.float32),
+        ):
+            with self.subTest(shape=audio.shape):
+                with self.assertRaisesRegex(ValueError, 'one.*two'):
+                    prepare_mix(audio)
+
     def test_output_conversion_replaces_only_the_final_suffix(self):
         audio_path = str(Path('folder.wav') / 'Track.WAV')
 
