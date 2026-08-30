@@ -130,6 +130,19 @@ class CoreCompatibilityTests(unittest.TestCase):
         self.assertIn('$RequiredBinaries = @(', definition)
         self.assertIn('Required bundled binary is missing:', definition)
 
+    def test_windows_package_excludes_unused_pytorch_tooling(self):
+        spec = (Path(__file__).resolve().parents[1] / 'UVR-Windows.spec').read_text(
+            encoding='utf-8'
+        )
+        for module_name in (
+            'torch._dynamo',
+            'torch._inductor',
+            'torch.testing',
+            'torch.utils.benchmark',
+            'torch.utils.tensorboard',
+        ):
+            self.assertIn(repr(module_name), spec)
+
     def test_missing_demucs_repository_reports_model_loading_error(self):
         with TemporaryDirectory() as directory:
             missing_repository = Path(directory) / 'missing-models'
