@@ -30,6 +30,18 @@ class CoreCompatibilityTests(unittest.TestCase):
         builder = Path(__file__).resolve().parents[1] / 'build_windows.ps1'
         definition = builder.read_text(encoding='utf-8')
         self.assertIn("$SndFileLibrary = Join-Path $BinaryDirectory 'sndfile.dll'", definition)
+        self.assertIn(
+            'Test-Path -LiteralPath $FfmpegExecutable -PathType Leaf',
+            definition,
+        )
+        self.assertIn(
+            'Test-Path -LiteralPath $RubberBandExecutable -PathType Leaf',
+            definition,
+        )
+        self.assertIn(
+            'Test-Path -LiteralPath $SndFileLibrary -PathType Leaf',
+            definition,
+        )
         self.assertIn('$RequiredBinaries = @(', definition)
         self.assertIn('Required bundled binary is missing:', definition)
 
