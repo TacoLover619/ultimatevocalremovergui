@@ -1,0 +1,7 @@
+.venv/
+build/
+dist/
+third_party/
+__pycache__/
+*.py[cod]
+data.pkl

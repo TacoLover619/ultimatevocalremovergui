@@ -1,4 +1,11 @@
 # Ultimate Vocal Remover GUI v5.6
+
+> **Windows 11 modernization:** The `codex/windows11-modernization` branch adds
+> Python 3.12 support, current audio/ML runtimes, safer checkpoint loading,
+> CUDA 12.6 acceleration, reproducible PyInstaller packaging, and core inference
+> tests. See [WINDOWS_11_MODERNIZATION.md](WINDOWS_11_MODERNIZATION.md) for the
+> complete technical change record and [WINDOWS_BUILD.md](WINDOWS_BUILD.md) for
+> build instructions.
 <img src="https://raw.githubusercontent.com/Anjok07/ultimatevocalremovergui/master/gui_data/img/UVR_v5.6.png?raw=true" />
 
 [![Release](https://img.shields.io/github/release/anjok07/ultimatevocalremovergui.svg)](https://github.com/anjok07/ultimatevocalremovergui/releases/latest)

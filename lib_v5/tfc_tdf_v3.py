@@ -20,8 +20,15 @@ class STFT:
         batch_dims = x.shape[:-2]
         c, t = x.shape[-2:]
         x = x.reshape([-1, t])
-        x = torch.stft(x, n_fft=self.n_fft, hop_length=self.hop_length, window=window, center=True,return_complex=False)
-        x = x.permute([0, 3, 1, 2])
+        x = torch.stft(
+            x,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            window=window,
+            center=True,
+            return_complex=True,
+        )
+        x = torch.view_as_real(x).permute([0, 3, 1, 2])
         x = x.reshape([*batch_dims, c, 2, -1, x.shape[-1]]).reshape([*batch_dims, c * 2, -1, x.shape[-1]])
 
         if x_is_mps:
