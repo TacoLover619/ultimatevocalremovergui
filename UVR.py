@@ -40,6 +40,7 @@ from gui_data.constants import *
 from gui_data.app_size_values import *
 from gui_data.error_handling import error_text, error_dialouge
 from gui_data.old_data_check import file_check, remove_unneeded_yamls, remove_temps
+from gui_data.update_checker import get_latest_release, update_available
 from gui_data.tkinterdnd2 import TkinterDnD, DND_FILES
 from lib_v5.vr_network.model_param_init import ModelParameters
 from kthread import KThread
@@ -88,8 +89,6 @@ def get_execution_time(function, name):
     end = time.time()
     time_difference = end - start
     print(f'{name} Execution Time: ', time_difference)
-
-PREVIOUS_PATCH_WIN = 'UVR_Patch_10_6_23_4_27'
 
 is_dnd_compatible = True
 banner_placement = -2
@@ -3932,7 +3931,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         Link(place=4, 
              frame=more_info_tab_Frame, 
              text="Ultimate Vocal Remover (Official GitHub)", 
-             link="https://github.com/Anjok07/ultimatevocalremovergui", 
+             link="https://github.com/TacoLover619/ultimatevocalremovergui",
              description="You can find updates, report issues, and give us a shout via our official GitHub.",
              font=FONT_SIZE_1)
         
@@ -4382,13 +4381,8 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         """Ask user is they want to update"""
         
         is_new_update = self.online_data_refresh(confirmation_box=True)
-        is_download_in_app_var = tk.BooleanVar(value=False)
-        
         def update_type():
-            if is_download_in_app_var.get():
-                self.download_item(is_update_app=True)
-            else:
-                webbrowser.open_new_tab(self.download_update_link_var.get())
+            webbrowser.open_new_tab(self.download_update_link_var.get())
 
             update_confirmation_win.destroy()
             
@@ -4411,10 +4405,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             no_button = ttk.Button(update_confirmation_Frame, text=NO_TEXT, command=lambda:(update_confirmation_win.destroy()))
             no_button.grid(row=3,column=0,padx=0,pady=MENU_PADDING_1)
             
-            if is_windows:
-                download_outside_application_button = ttk.Checkbutton(update_confirmation_Frame, variable=is_download_in_app_var, text='Download Update in Application')
-                download_outside_application_button.grid(row=4,column=0,padx=0,pady=MENU_PADDING_1)
-
             self.menu_placement(update_confirmation_win, CONFIRM_UPDATE_TEXT, pop_up=True)
 
     def pop_up_user_code_input(self):
@@ -5164,38 +5154,25 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 if refresh_list_Button:
                     self.download_progress_info_var.set('Download List Refreshed!')
 
-                if OPERATING_SYSTEM=="Darwin":
-                    self.lastest_version = self.online_data["current_version_mac"]
-                elif OPERATING_SYSTEM=="Linux":
-                    self.lastest_version = self.online_data["current_version_linux"]
-                else:
-                    self.lastest_version = self.online_data["current_version"]
-                    
-                if self.lastest_version == current_patch and not is_start_up:
+                try:
+                    latest_release = get_latest_release()
+                    self.lastest_version = latest_release['version']
+                    is_new_update = update_available(VERSION, self.lastest_version)
+                except Exception as release_error:
+                    latest_release = None
+                    is_new_update = False
+                    print(f'GitHub release check failed: {release_error}')
+
+                if not is_new_update and not is_start_up:
                     self.app_update_status_Text_var.set('UVR Version Current')
-                else:
-                    is_new_update = True
-                    is_beta_version = True if self.lastest_version == PREVIOUS_PATCH_WIN and BETA_VERSION in current_patch else False
-                    
+                elif is_new_update:
+                    self.download_update_link_var.set(latest_release['url'])
                     if not is_start_up:
-                        if is_beta_version:
-                            self.app_update_status_Text_var.set(f"Roll Back: {self.lastest_version}")
-                            self.app_update_button_Text_var.set(ROLL_BACK_TEXT)
-                        else:
-                            self.app_update_status_Text_var.set(f"Update Found: {self.lastest_version}")
-                            self.app_update_button_Text_var.set('Click Here to Update')
-                        
-                        if OPERATING_SYSTEM == "Windows":
-                            self.download_update_link_var.set(f'{UPDATE_REPO}{self.lastest_version}{application_extension}')
-                            self.download_update_path_var.set(os.path.join(BASE_PATH, f'{self.lastest_version}{application_extension}'))
-                        elif OPERATING_SYSTEM == "Darwin":
-                            self.download_update_link_var.set(UPDATE_MAC_ARM_REPO if SYSTEM_PROC == ARM or ARM in SYSTEM_ARCH else UPDATE_MAC_X86_64_REPO)
-                        elif OPERATING_SYSTEM == "Linux":
-                            self.download_update_link_var.set(UPDATE_LINUX_REPO)
-                    
+                        self.app_update_status_Text_var.set(f"Update Found: {self.lastest_version}")
+                        self.app_update_button_Text_var.set('Click Here to Update')
+
                     if not user_refresh:
-                        if not is_beta_version and not self.lastest_version == current_patch:
-                            self.command_Text.write(NEW_UPDATE_FOUND_TEXT(self.lastest_version))
+                        self.command_Text.write(NEW_UPDATE_FOUND_TEXT(self.lastest_version))
 
 
                 is_update_params = self.is_auto_update_model_params if is_start_up else self.is_auto_update_model_params_var.get()
