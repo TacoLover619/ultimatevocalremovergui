@@ -6083,14 +6083,18 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         def time_elapsed():
             return f'Time Elapsed: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - stime)))}'
 
-        def get_audio_file_base(audio_file):
+        def get_audio_file_base(audio_file, file_num):
             if audio_tool.audio_tool == MANUAL_ENSEMBLE:
                 source_path = inputPaths[0]
             elif audio_tool.audio_tool in [ALIGN_INPUTS, MATCH_INPUTS]:
                 source_path = audio_file[0]
             else:
                 source_path = audio_file
-            return clean_output_base(source_path, output_timestamp)
+            return clean_output_base(
+                source_path,
+                output_timestamp,
+                file_num if len(inputPaths) > 1 else None,
+            )
 
         def handle_ensemble(inputPaths, audio_file_base):
             self.progress_bar_main_var.set(50)
@@ -6163,7 +6167,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             for file_num, audio_file in enumerate(inputPaths, start=1):
                 self.iteration += 1
                 base = (100 / total_files)
-                audio_file_base = get_audio_file_base(audio_file)
+                audio_file_base = get_audio_file_base(audio_file, file_num)
                 self.base_text = self.process_get_baseText(total_files=total_files, file_num=total_files if multiple_files else file_num, is_dual=is_dual)
                 command_Text = lambda text: self.command_Text.write(self.base_text + text)
 
@@ -6386,6 +6390,12 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     is_verified_audio = False
                     continue
 
+                audio_file_base = clean_output_base(
+                    original_audio_file,
+                    output_timestamp,
+                    file_num if inputPath_total_len > 1 else None,
+                )
+
                 for current_model_num, current_model in enumerate(model, start=1):
                     self.iteration += 1
 
@@ -6398,11 +6408,10 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     set_progress_bar = lambda step, inference_iterations=0:self.process_update_progress(total_files=inputPath_total_len, step=(step + (inference_iterations)))
                     write_to_console = lambda progress_text, base_text=base_text:self.command_Text.write(base_text + progress_text)
 
-                    audio_file_base = clean_output_base(original_audio_file, output_timestamp)
-                    audio_file_base = audio_file_base if not self.is_testing_audio_var.get() or is_ensemble else f"{round(time.time())}_{audio_file_base}"
-                    audio_file_base = audio_file_base if not is_ensemble else f"{audio_file_base}_{current_model.model_basename}"
+                    model_audio_file_base = audio_file_base if not self.is_testing_audio_var.get() or is_ensemble else f"{round(time.time())}_{audio_file_base}"
+                    model_audio_file_base = model_audio_file_base if not is_ensemble else f"{model_audio_file_base}_{current_model.model_basename}"
                     if not is_ensemble:
-                        audio_file_base = audio_file_base if not self.is_add_model_name_var.get() else f"{audio_file_base}_{current_model.model_basename}"
+                        model_audio_file_base = model_audio_file_base if not self.is_add_model_name_var.get() else f"{model_audio_file_base}_{current_model.model_basename}"
 
                     if self.is_create_model_folder_var.get() and not is_ensemble:
                         export_path = os.path.join(Path(self.export_path_var.get()), current_model.model_basename, os.path.splitext(os.path.basename(audio_file))[0])
@@ -6411,7 +6420,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     process_data = {
                                     'model_data': current_model, 
                                     'export_path': export_path,
-                                    'audio_file_base': audio_file_base,
+                                    'audio_file_base': model_audio_file_base,
                                     'audio_file': audio_file,
                                     'set_progress_bar': set_progress_bar,
                                     'write_to_console': write_to_console,
@@ -6436,7 +6445,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
 
                 if is_ensemble:
                     
-                    audio_file_base = audio_file_base.replace(f"_{current_model.model_basename}","")
                     self.command_Text.write(base_text + ENSEMBLING_OUTPUTS)
                     
                     if self.ensemble_main_stem_var.get() in [FOUR_STEM_ENSEMBLE, MULTI_STEM_ENSEMBLE]:
