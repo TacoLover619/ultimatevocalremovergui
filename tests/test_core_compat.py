@@ -14,6 +14,7 @@ from lib_v5 import spec_utils
 from lib_v5.tfc_tdf_v3 import STFT
 from separate import (
     backend_output_to_tensor,
+    convert_onnx_model,
     load_mdx_checkpoint,
     output_path_for_format,
     prepare_mix,
@@ -48,6 +49,35 @@ class CoreCompatibilityTests(unittest.TestCase):
         for module_name in ('scipy', 'audioread', 'librosa', 'onnxruntime'):
             self.assertIn(module_name, imports)
             self.assertLess(torch_index, imports.index(module_name))
+
+    def test_optional_onnx_converter_is_not_imported_at_startup(self):
+        imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'separate.py')
+        self.assertNotIn('onnx', imports)
+        self.assertNotIn('onnx2pytorch', imports)
+
+    def test_lazy_onnx_converter_preserves_model_output(self):
+        import onnx
+        from onnx import TensorProto, helper
+
+        graph = helper.make_graph(
+            [helper.make_node('Relu', ['input'], ['output'])],
+            'relu',
+            [helper.make_tensor_value_info('input', TensorProto.FLOAT, [1, 2])],
+            [helper.make_tensor_value_info('output', TensorProto.FLOAT, [1, 2])],
+        )
+        model = helper.make_model(
+            graph,
+            opset_imports=[helper.make_opsetid('', 13)],
+            ir_version=8,
+        )
+
+        with TemporaryDirectory() as directory:
+            model_path = Path(directory) / 'relu.onnx'
+            onnx.save(model, model_path)
+            converted = convert_onnx_model(model_path).eval()
+
+        output = converted(torch.tensor([[-1.0, 2.0]]))
+        self.assertTrue(torch.equal(output, torch.tensor([[0.0, 2.0]])))
 
     def test_pillow_resize_uses_supported_resampling_api(self):
         source = (

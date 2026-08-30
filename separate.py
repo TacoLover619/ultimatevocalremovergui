@@ -43,8 +43,6 @@ import pydub
 import soundfile as sf
 import lib_v5.mdxnet as MdxnetSet
 #import random
-from onnx import load
-from onnx2pytorch import ConvertModel
 import gc
  
 if TYPE_CHECKING:
@@ -116,6 +114,14 @@ def normalize_spectrogram(magnitude):
 
 def backend_output_to_tensor(output, device):
     return torch.as_tensor(output, device=device)
+
+
+def convert_onnx_model(model_path):
+    """Load the optional ONNX conversion stack only when MDX-C needs it."""
+    from onnx import load
+    from onnx2pytorch import ConvertModel
+
+    return ConvertModel(load(model_path))
 
 
 def select_onnx_providers(use_cuda):
@@ -550,7 +556,7 @@ class SeperateMDX(SeperateAttributes):
                     ort_ = ort.InferenceSession(self.model_path, providers=self.run_type)
                     self.model_run = lambda spek:ort_.run(None, {'input': spek.cpu().numpy()})[0]
                 else:
-                    self.model_run = ConvertModel(load(self.model_path))
+                    self.model_run = convert_onnx_model(self.model_path)
                     self.model_run.to(self.device).eval()
 
             self.running_inference_console_write()
