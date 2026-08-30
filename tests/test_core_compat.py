@@ -56,6 +56,13 @@ class CoreCompatibilityTests(unittest.TestCase):
         self.assertNotIn('matchering', imports)
         self.assertNotIn('onnx', imports)
 
+    def test_startup_cleanup_preserves_application_text_files(self):
+        source = (Path(__file__).resolve().parents[1] / 'UVR.py').read_text(
+            encoding='utf-8'
+        )
+        self.assertIn("EXTENSIONS = ('.aes', '.tmp')", source)
+        self.assertNotIn("('.aes', '.txt', '.tmp')", source)
+
     def test_optional_onnx_converter_is_not_imported_at_startup(self):
         imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'separate.py')
         self.assertNotIn('onnx', imports)
