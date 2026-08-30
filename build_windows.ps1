@@ -37,14 +37,14 @@ if (-not (Test-Path -LiteralPath $Python)) {
 New-Item -ItemType Directory -Path $DownloadDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $BinaryDirectory -Force | Out-Null
 
-if (-not (Test-Path -LiteralPath $FfmpegExecutable)) {
+if (-not (Test-Path -LiteralPath $FfmpegExecutable -PathType Leaf)) {
     & curl.exe -L --fail --retry 3 -o $FfmpegArchive 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip'
     $FfmpegExtract = Join-Path $ProjectRoot 'third_party\ffmpeg'
     Expand-Archive -LiteralPath $FfmpegArchive -DestinationPath $FfmpegExtract -Force
     Copy-Item -LiteralPath (Get-ChildItem -LiteralPath $FfmpegExtract -Filter ffmpeg.exe -Recurse -File).FullName -Destination $FfmpegExecutable
 }
 
-if (-not (Test-Path -LiteralPath $RubberBandExecutable) -or -not (Test-Path -LiteralPath $SndFileLibrary)) {
+if (-not (Test-Path -LiteralPath $RubberBandExecutable -PathType Leaf) -or -not (Test-Path -LiteralPath $SndFileLibrary -PathType Leaf)) {
     & curl.exe -L --fail --retry 3 -o $RubberBandArchive 'https://breakfastquay.com/files/releases/rubberband-3.3.0-gpl-executable-windows.zip'
     $RubberBandExtract = Join-Path $ProjectRoot 'third_party\rubberband'
     Expand-Archive -LiteralPath $RubberBandArchive -DestinationPath $RubberBandExtract -Force
