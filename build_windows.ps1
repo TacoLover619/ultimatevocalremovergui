@@ -59,3 +59,15 @@ if (Test-Path -LiteralPath $LockFile) {
     & $Python -m pip freeze --local | Set-Content -Encoding utf8 $LockFile
 }
 & $Python -m PyInstaller --noconfirm --clean (Join-Path $ProjectRoot 'UVR-Windows.spec')
+
+$InnoCompiler = @(
+    (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
+    'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+    'C:\Program Files\Inno Setup 6\ISCC.exe'
+) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
+if (-not $InnoCompiler) {
+    throw 'Inno Setup 6.5 or newer is required to build the v6.0 installer. Install JRSoftware.InnoSetup with winget.'
+}
+
+& $InnoCompiler (Join-Path $ProjectRoot 'UVR-Windows.iss')

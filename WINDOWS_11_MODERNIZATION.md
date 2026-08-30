@@ -1,8 +1,8 @@
-# Windows 11 modernization: complete change record
+# Version 6.0 Windows 11 modernization: complete change record
 
 ## Scope
 
-This change set modernizes the existing UVR 5.6 application without redesigning
+Version 6.0 modernizes the existing UVR application without redesigning
 the interface or changing its source-separation workflow. Work is deliberately
 limited to the core audio and model execution paths, dependency compatibility,
 runtime reliability, tests, and reproducible Windows packaging.
@@ -137,6 +137,16 @@ include:
 
 ## Windows packaging
 
+Version 6.0 adds both the portable PyInstaller application and an original-style
+Inno Setup Windows installer. The installer provides Start Menu and optional
+Desktop shortcuts, a standard Windows uninstall entry, per-user installation in
+a writable application directory, and versioned executable metadata.
+
+The CUDA distribution is larger than GitHub's 2 GiB per-asset limit, so Inno
+Setup disk spanning produces a small `UVR_v6.0.0_setup.exe` launcher plus
+numbered `.bin` payload files. All parts must be downloaded into the same folder
+before running setup.
+
 ### PyInstaller specification
 
 `UVR-Windows.spec` is a checked-in, reproducible PyInstaller definition. It:
@@ -195,18 +205,21 @@ other large-file hosting after any desired code-signing step.
 The completed build was verified with:
 
 - Python bytecode compilation across the application source.
-- All four core compatibility tests passing.
+- All five core compatibility tests passing, including the release-version
+  assertion.
 - VR denoising inference on an NVIDIA GeForce RTX 4090 through CUDA.
 - ONNX Runtime session execution with `CUDAExecutionProvider` active and CPU
   fallback also available.
 - FFmpeg and Rubber Band version execution from the packaged directory.
 - A packaged GUI startup smoke test that remained healthy for 20 seconds and
   was then terminated by the test harness.
+- A complete installation from the split Inno Setup release artifacts, a
+  20-second startup test of the installed executable, and successful uninstall.
 
 The tested executable SHA-256 was:
 
 ```text
-14CFD703CCA4BDC1CC1C5BE7C7C0146A14E3AC88041BF4E6A58267CF5017C692
+0B801BD739152604ADF4E607A6B0300C8209688C4385F9D2EB7A1D8284AE27C8
 ```
 
 That hash identifies the locally tested artifact only. Rebuilding changes the
@@ -215,8 +228,8 @@ byte-for-byte build.
 
 ## Known limitations and intentional non-goals
 
-- This branch creates a portable directory build, not an Inno Setup or NSIS
-  installer.
+- The release installer is split into one setup EXE and numbered `.bin` files
+  to stay below GitHub's 2 GiB per-file limit; all parts are required.
 - The executable is not Authenticode-signed.
 - NVIDIA CUDA and ONNX CUDA execution are verified. TensorRT is not bundled and
   remains optional; ONNX Runtime uses its CUDA provider directly.

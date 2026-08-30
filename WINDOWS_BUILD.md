@@ -1,4 +1,4 @@
-# Windows 11 build
+# Windows 11 v6.0 build
 
 The Windows build uses Python 3.12, PyInstaller 6, PyTorch 2.9.1 with CUDA
 12.6, and ONNX Runtime GPU. CUDA execution falls back to CPU on systems that
@@ -19,14 +19,21 @@ To use a specific Python installation:
 ```
 
 The script creates an isolated environment, installs the locked dependencies,
-downloads FFmpeg and Rubber Band, and builds the portable application at:
+downloads FFmpeg and Rubber Band, builds the portable application, and then
+builds the Windows installer. Outputs are written to:
 
 ```text
 dist\Ultimate Vocal Remover\Ultimate Vocal Remover.exe
+installer\UVR_v6.0.0_setup.exe
+installer\UVR_v6.0.0_setup-*.bin
 ```
 
 Keep the entire `Ultimate Vocal Remover` directory together when moving the
 application. The executable depends on its `_internal` directory.
+
+For the installer release, keep `UVR_v6.0.0_setup.exe` and every numbered
+`UVR_v6.0.0_setup-*.bin` payload file together. GitHub requires the split
+payload because each release asset must be smaller than 2 GiB.
 
 ## Verify source changes
 

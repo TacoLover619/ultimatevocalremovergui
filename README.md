@@ -1,14 +1,14 @@
-# Ultimate Vocal Remover GUI v5.6
+# Ultimate Vocal Remover GUI v6.0
 
 <img src="https://raw.githubusercontent.com/Anjok07/ultimatevocalremovergui/master/gui_data/img/UVR_v5.6.png?raw=true" />
 
-[![Release](https://img.shields.io/github/release/anjok07/ultimatevocalremovergui.svg)](https://github.com/anjok07/ultimatevocalremovergui/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/anjok07/ultimatevocalremovergui/total.svg)](https://github.com/anjok07/ultimatevocalremovergui/releases)
+[![Release](https://img.shields.io/github/release/TacoLover619/ultimatevocalremovergui.svg)](https://github.com/TacoLover619/ultimatevocalremovergui/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/TacoLover619/ultimatevocalremovergui/total.svg)](https://github.com/TacoLover619/ultimatevocalremovergui/releases)
 
-## Windows 11 modernization branch
+## Version 6.0 — Windows 11 modernization
 
-The `codex/windows11-modernization` branch is a focused modernization of the
-UVR 5.6 runtime and Windows packaging. It does not replace the interface,
+Version 6.0 is a focused modernization of the UVR runtime and Windows
+packaging. It does not replace the interface,
 change the trained separation models, or claim different model quality. It
 updates the software surrounding those models so the existing VR, MDX-Net,
 MDX23C, and Demucs pipelines can run on a current Windows 11, Python, PyTorch,
@@ -190,12 +190,19 @@ dist\Ultimate Vocal Remover\Ultimate Vocal Remover.exe
 The whole `Ultimate Vocal Remover` directory must remain together because the
 executable depends on its `_internal` directory.
 
+The release build additionally wraps this directory in an Inno Setup installer
+named `UVR_v6.0.0_setup.exe`. Because GitHub restricts each release asset to
+less than 2 GiB, the CUDA payload is split into numbered `.bin` files. Download
+the setup EXE and every matching `.bin` file into the same folder, then run the
+EXE. The installer creates Start Menu and optional Desktop shortcuts and
+registers a standard Windows uninstaller.
+
 Full rebuild commands and prerequisites are documented in
 [`WINDOWS_BUILD.md`](WINDOWS_BUILD.md).
 
 ### Automated core tests
 
-[`tests/test_core_compat.py`](tests/test_core_compat.py) contains four focused
+[`tests/test_core_compat.py`](tests/test_core_compat.py) contains five focused
 tests:
 
 1. Loads the bundled VR model and MDX mixer checkpoint using the modern safe
@@ -205,6 +212,7 @@ tests:
 3. Runs an STFT/inverse-STFT round trip and validates shape and finite samples.
 4. Runs actual neural inference with `UVR-DeNoise-Lite.pth`, then validates that
    the result matches the input shape and contains only finite samples.
+5. Verifies that the packaged application reports the v6.0.0 release version.
 
 These tests can be run with:
 
@@ -216,7 +224,7 @@ These tests can be run with:
 
 The modernization was verified with more than a GUI import check:
 
-- All four core compatibility tests pass.
+- All five core compatibility tests pass.
 - Python bytecode compilation passes for `UVR.py`, `separate.py`, `demucs/`,
   `lib_v5/`, `gui_data/`, and the tests.
 - The bundled UVR denoising model completes real inference with finite,
@@ -228,13 +236,15 @@ The modernization was verified with more than a GUI import check:
 - Rubber Band 3.3.0 executes from the packaged runtime.
 - The packaged GUI remains healthy through a 20-second startup smoke test and
   is then stopped by the test harness.
+- The split release installer completes a full isolated installation, launches
+  the installed GUI successfully, and registers a working uninstaller.
 - `git diff --check` passes.
 
 The locally tested CUDA package is approximately 5.28 GB. Its executable hash
 was:
 
 ```text
-SHA-256: 14CFD703CCA4BDC1CC1C5BE7C7C0146A14E3AC88041BF4E6A58267CF5017C692
+SHA-256: 0B801BD739152604ADF4E607A6B0300C8209688C4385F9D2EB7A1D8284AE27C8
 ```
 
 The hash identifies that local build only. PyInstaller is not currently
@@ -248,6 +258,7 @@ Generated and downloaded files are deliberately excluded from Git:
 - `.venv/`
 - `build/`
 - `dist/`
+- `installer/`
 - `third_party/`
 - Python bytecode caches
 - UVR's generated `data.pkl` settings file
@@ -261,8 +272,8 @@ Third-party redistribution notes are recorded in
 
 ### Known limitations
 
-- This branch creates a portable PyInstaller directory, not an Inno Setup or
-  NSIS installer.
+- Version 6.0 adds an Inno Setup installer around the portable directory. The
+  portable build remains available as the installer input and debugging form.
 - The locally generated executable is not Authenticode-signed.
 - NVIDIA CUDA and ONNX CUDA execution were verified. TensorRT is optional and
   is not bundled.
@@ -290,6 +301,7 @@ Third-party redistribution notes are recorded in
 | `requirements-windows.in` | Direct modern Windows/CUDA dependencies |
 | `requirements-windows.lock.txt` | Exact tested dependency graph |
 | `UVR-Windows.spec` | Reproducible PyInstaller package definition |
+| `UVR-Windows.iss` | Inno Setup v6.0 installer definition |
 | `build_windows.ps1` | Automated Windows build workflow |
 | `tests/test_core_compat.py` | Core transform, model-loading, and inference tests |
 | `.gitignore` | Excludes generated, downloaded, runtime, and package files |
@@ -320,9 +332,12 @@ These bundles contain the UVR interface, Python, PyTorch, and other dependencies
     - Application functionality for Intel Pentium & Celeron CPUs systems is not guaranteed.
     - You must install UVR to the main C:\ drive. Installing UVR to a secondary drive will cause instability.
 
-- Download the UVR installer for Windows via the link below:
-    - [Main Download Link](https://github.com/Anjok07/ultimatevocalremovergui/releases/download/v5.6/UVR_v5.6.0_setup.exe)
-    - [Main Download Link mirror](https://www.mediafire.com/file_premium/jiatpgp0ljou52p/UVR_v5.6.0_setup.exe/file)
+- Download all three v6.0 files below into the same folder, then run the setup
+  EXE. The two `.bin` files are required installer data, not optional downloads:
+    - [`UVR_v6.0.0_setup.exe`](https://github.com/TacoLover619/ultimatevocalremovergui/releases/download/v6.0.0/UVR_v6.0.0_setup.exe)
+    - [`UVR_v6.0.0_setup-1.bin`](https://github.com/TacoLover619/ultimatevocalremovergui/releases/download/v6.0.0/UVR_v6.0.0_setup-1.bin)
+    - [`UVR_v6.0.0_setup-2.bin`](https://github.com/TacoLover619/ultimatevocalremovergui/releases/download/v6.0.0/UVR_v6.0.0_setup-2.bin)
+    - [`SHA256SUMS.txt`](https://github.com/TacoLover619/ultimatevocalremovergui/releases/download/v6.0.0/SHA256SUMS.txt)
 - If you use an **AMD Radeon or Intel Arc graphics card**, you can try the DirectML version:
     - [DirectML Version - Main Download Link](https://github.com/Anjok07/ultimatevocalremovergui/releases/download/v5.6/UVR_1_15_25_22_30_BETA_full.exe)
 - Update Package instructions for those who have UVR already installed:

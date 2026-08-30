@@ -1,4 +1,4 @@
-VERSION = 'v5.6.0'
-PATCH = 'UVR_Patch_9_29_23_1_39'
+VERSION = 'v6.0.0'
+PATCH = 'UVR_v6.0.0_Windows_11'
 PATCH_MAC = 'UVR_Patch_9_29_23_1_39'
 PATCH_LINUX = 'UVR_Patch_9_29_23_1_39'

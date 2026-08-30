@@ -3,12 +3,16 @@ import unittest
 import numpy as np
 import torch
 
+from __version__ import VERSION
 from lib_v5 import spec_utils
 from lib_v5.tfc_tdf_v3 import STFT
 from separate import vr_denoiser
 
 
 class CoreCompatibilityTests(unittest.TestCase):
+    def test_release_version(self):
+        self.assertEqual(VERSION, 'v6.0.0')
+
     def test_stft_round_trip_is_finite(self):
         audio = torch.randn(1, 2, 44_100)
         transform = STFT(2_048, 1_024, 1_025, torch.device('cpu'))

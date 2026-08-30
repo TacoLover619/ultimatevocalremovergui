@@ -1,6 +1,7 @@
 .venv/
 build/
 dist/
+installer/
 third_party/
 __pycache__/
 *.py[cod]
