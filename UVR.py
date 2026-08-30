@@ -1,6 +1,9 @@
 # GUI modules
 import time
 #start_time = time.time()
+# Initialize PyTorch before GUI and audio libraries load native DLLs. PyTorch
+# 2.9 can otherwise fail to initialize c10.dll in frozen Windows applications.
+import torch
 import audioread
 import gui_data.sv_ttk
 import hashlib
@@ -18,7 +21,6 @@ import queue
 import shutil
 import subprocess
 import soundfile as sf
-import torch
 import urllib.request
 import webbrowser
 import wget
