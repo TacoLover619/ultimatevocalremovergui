@@ -96,6 +96,11 @@ def load_mdx_checkpoint(model_path, device):
             f'MDX checkpoint is missing required {error.args[0]!r} data'
         ) from error
 
+    if not isinstance(model_params, dict):
+        raise ValueError('MDX checkpoint "hyper_parameters" must be a dictionary')
+    if not isinstance(state_dict, dict):
+        raise ValueError('MDX checkpoint "state_dict" must be a dictionary')
+
     model = MdxnetSet.ConvTDFNet(**model_params)
     model.load_state_dict(state_dict)
     return model_params, model.to(device).eval()
