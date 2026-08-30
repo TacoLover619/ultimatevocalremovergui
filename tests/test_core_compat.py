@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 import numpy as np
 import torch
@@ -7,7 +8,7 @@ import torch
 from __version__ import VERSION
 from lib_v5 import spec_utils
 from lib_v5.tfc_tdf_v3 import STFT
-from separate import vr_denoiser
+from separate import load_mdx_checkpoint, vr_denoiser
 
 
 class CoreCompatibilityTests(unittest.TestCase):
@@ -50,6 +51,44 @@ class CoreCompatibilityTests(unittest.TestCase):
 
         self.assertGreater(len(vr_model), 0)
         self.assertGreater(len(mixer), 0)
+
+    @patch('separate.MdxnetSet.ConvTDFNet')
+    @patch('separate.torch.load')
+    def test_mdx_checkpoint_loads_state_dict_into_plain_module(
+        self,
+        torch_load,
+        conv_tdf_net,
+    ):
+        model_params = {
+            'dim_c': 4,
+            'hop_length': 1024,
+        }
+        state_dict = {'first_conv.0.weight': torch.ones(1)}
+        model = Mock()
+        model.to.return_value = model
+        model.eval.return_value = model
+        conv_tdf_net.return_value = model
+        torch_load.return_value = {
+            'hyper_parameters': model_params,
+            'state_dict': state_dict,
+        }
+
+        loaded_params, loaded_model = load_mdx_checkpoint(
+            'model.ckpt',
+            torch.device('cpu'),
+        )
+
+        torch_load.assert_called_once_with(
+            'model.ckpt',
+            map_location='cpu',
+            weights_only=True,
+        )
+        conv_tdf_net.assert_called_once_with(**model_params)
+        model.load_state_dict.assert_called_once_with(state_dict)
+        model.to.assert_called_once_with(torch.device('cpu'))
+        model.eval.assert_called_once_with()
+        self.assertIs(loaded_params, model_params)
+        self.assertIs(loaded_model, model)
 
     def test_bundled_vr_model_runs_inference(self):
         audio = np.random.default_rng(1).normal(
