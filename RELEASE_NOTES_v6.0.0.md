@@ -1,10 +1,9 @@
 # Ultimate Vocal Remover GUI v6.0.0
 
-Version 6.0 is a focused Windows 11 and Python-runtime modernization of the
-existing UVR application. It preserves UVR's separation workflows, model
-formats, interface, and model-download system while updating the software stack
-that loads models, processes audio, uses NVIDIA GPUs, and produces Windows
-releases.
+Version 6.0 updates UVR for Windows 11 and Python 3.12. Existing separation
+workflows, model formats, the interface, and the model download system are
+unchanged. This release updates model loading, audio processing, NVIDIA GPU
+support, dependencies, and Windows packaging.
 
 ## Download and installation
 

@@ -5,14 +5,12 @@
 [![Release](https://img.shields.io/github/release/TacoLover619/ultimatevocalremovergui.svg)](https://github.com/TacoLover619/ultimatevocalremovergui/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/TacoLover619/ultimatevocalremovergui/total.svg)](https://github.com/TacoLover619/ultimatevocalremovergui/releases)
 
-## Version 6.0 — Windows 11 modernization
+## What's new in version 6.0
 
-Version 6.0 is a focused modernization of the UVR runtime and Windows
-packaging. It does not replace the interface,
-change the trained separation models, or claim different model quality. It
-updates the software surrounding those models so the existing VR, MDX-Net,
-MDX23C, and Demucs pipelines can run on a current Windows 11, Python, PyTorch,
-Librosa, ONNX, and CUDA stack.
+Version 6.0 updates the UVR runtime and Windows packaging. The interface,
+trained separation models, and separation methods have not been replaced. The
+VR, MDX-Net, MDX23C, and Demucs pipelines now run with current Windows 11,
+Python, PyTorch, Librosa, ONNX, and CUDA versions.
 
 ### Tested runtime
 
@@ -145,8 +143,8 @@ paths the application actually uses:
   `onnxruntime-gpu` was removed.
 - `pytorch_lightning` was removed after the MDX inference class was converted to
   `torch.nn.Module`.
-- Previously undeclared or unreliable direct dependencies—including
-  `pyrubberband`, `omegaconf`, and `tqdm`—are now declared.
+- Previously undeclared or unreliable direct dependencies, including
+  `pyrubberband`, `omegaconf`, and `tqdm`, are now declared.
 - `opencv-python-headless` is used because UVR does not require OpenCV's separate
   GUI toolkit.
 - Direct requirements live in `requirements-windows.in`.
