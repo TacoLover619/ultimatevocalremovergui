@@ -347,7 +347,8 @@ def temp_filenames(count, delete=True):
     names = []
     try:
         for _ in range(count):
-            names.append(tempfile.NamedTemporaryFile(delete=False).name)
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                names.append(temp_file.name)
         yield names
     finally:
         if delete:

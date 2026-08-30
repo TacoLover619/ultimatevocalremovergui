@@ -919,11 +919,14 @@ class SeperateDemucs(SeperateAttributes):
 
         if is_no_cache:
             if self.demucs_version == DEMUCS_V1:
-                if str(self.model_path).endswith(".gz"):
-                    self.model_path = gzip.open(self.model_path, "rb")
                 # Legacy Demucs v1 packages serialize their model class. Only load
                 # model files obtained from UVR's trusted model repository.
-                klass, args, kwargs, state = torch.load(self.model_path, weights_only=False)
+                if str(self.model_path).endswith(".gz"):
+                    with gzip.open(self.model_path, "rb") as model_file:
+                        package = torch.load(model_file, weights_only=False)
+                else:
+                    package = torch.load(self.model_path, weights_only=False)
+                klass, args, kwargs, state = package
                 self.demucs = klass(*args, **kwargs)
                 self.demucs.to(self.device) 
                 self.demucs.load_state_dict(state)
