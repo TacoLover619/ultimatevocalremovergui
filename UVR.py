@@ -1377,7 +1377,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.is_secondary_stem_only_Demucs_Text_var = tk.StringVar(value='')
         self.scaling_var = tk.DoubleVar(value=1.0)
         self.active_processing_thread = None
-        self.verification_thread = None
         self.is_menu_settings_open = False
         self.is_root_defined_var = tk.BooleanVar(value=False)
         self.is_check_splash = False
@@ -1386,7 +1385,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.is_open_menu_advanced_demucs_options = tk.BooleanVar(value=False)
         self.is_open_menu_advanced_mdx_options = tk.BooleanVar(value=False)
         self.is_open_menu_advanced_ensemble_options = tk.BooleanVar(value=False)
-        self.is_open_menu_view_inputs = tk.BooleanVar(value=False)
         self.is_open_menu_help = tk.BooleanVar(value=False)
         self.is_open_menu_error_log = tk.BooleanVar(value=False)
         self.is_open_menu_advanced_align_options = tk.BooleanVar(value=False)
@@ -1397,7 +1395,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.menu_advanced_ensemble_options_close_window = None
         self.menu_help_close_window = None
         self.menu_error_log_close_window = None
-        self.menu_view_inputs_close_window = None
         self.menu_advanced_align_options_close_window = None
 
         self.mdx_model_params = None
@@ -2079,7 +2076,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             
         self.ensemble_listbox_Option.bind('<<ListboxSelect>>', lambda e: self.chosen_ensemble_var.set(CHOOSE_ENSEMBLE_OPTION))
         self.options_Frame.bind(right_click_button, lambda e:(self.right_click_menu_popup(e, main_menu=True), self.options_Frame.focus()))
-        self.filePaths_musicFile_Entry.bind(right_click_button, lambda e:(self.input_right_click_menu(e), self.filePaths_musicFile_Entry.focus()))
 
         self.fileOne_Entry.bind('<Button-1>', lambda e:self.menu_batch_dual())
         self.fileTwo_Entry.bind('<Button-1>', lambda e:self.menu_batch_dual())
@@ -2344,7 +2340,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 ENSEMBLE_OPTION: (self.is_open_menu_advanced_ensemble_options, self.menu_advanced_ensemble_options, self.menu_advanced_ensemble_options_close_window),
                 HELP_OPTION: (self.is_open_menu_help, self.menu_help, self.menu_help_close_window),
                 ERROR_OPTION: (self.is_open_menu_error_log, self.menu_error_log, self.menu_error_log_close_window),
-                INPUTS_MENU: (self.is_open_menu_view_inputs, self.menu_view_inputs, self.menu_view_inputs_close_window),
                 ALIGNMENT_TOOL: (self.is_open_menu_advanced_align_options, self.menu_advanced_align_options, self.menu_advanced_align_options_close_window)
             }
 
@@ -2354,17 +2349,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             open_method()
         except Exception as e:
             self.error_log_var.set(f"{error_text(menu, e)}")
-
-    def input_right_click_menu(self, event):
-
-        right_click_menu = tk.Menu(self, font=(MAIN_FONT_NAME, FONT_SIZE_1), tearoff=0)
-        right_click_menu.add_command(label='See All Inputs', command=lambda:self.check_is_menu_open(INPUTS_MENU))
-        
-        try:
-            right_click_menu.tk_popup(event.x_root,event.y_root)
-            right_click_release_linux(right_click_menu)
-        finally:
-            right_click_menu.grab_release()
 
     def input_dual_right_click_menu(self, event, is_primary:bool):
         input_path = self.fileOneEntry_Full_var.get() if is_primary else self.fileTwoEntry_Full_var.get()
@@ -2830,199 +2814,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         else:
             return tab1
 
-    def menu_view_inputs(self):
-                     
-        menu_view_inputs_top = tk.Toplevel(root)
-    
-        self.is_open_menu_view_inputs.set(True)
-        self.menu_view_inputs_close_window = lambda:close_window()
-        menu_view_inputs_top.protocol("WM_DELETE_WINDOW", self.menu_view_inputs_close_window)
-    
-        input_length_var = tk.StringVar(value='')   
-        input_info_text_var = tk.StringVar(value='')  
-        is_widen_box_var = tk.BooleanVar(value=False) 
-        is_play_file_var = tk.BooleanVar(value=False) 
-        varification_text_var = tk.StringVar(value=VERIFY_INPUTS_TEXT)
-
-        reset_list = lambda:(input_files_listbox_Option.delete(0, 'end'), [input_files_listbox_Option.insert(tk.END, inputs) for inputs in self.inputPaths])
-        audio_input_total = lambda:input_length_var.set(f'{AUDIO_INPUT_TOTAL_TEXT}: {len(self.inputPaths)}')
-        audio_input_total()
-
-        def list_diff(list1, list2): return list(set(list1).symmetric_difference(set(list2)))
-
-        def list_to_string(list1): return '\n'.join(''.join(sub) for sub in list1)
-
-        def close_window():
-            self.verification_thread.kill() if self.thread_check(self.verification_thread) else None
-            self.is_open_menu_view_inputs.set(False)
-            menu_view_inputs_top.destroy()
-
-        def drag_n_drop(e):
-            input_info_text_var.set('')
-            drop(e, accept_mode='files')
-            reset_list()
-            audio_input_total()
-            
-        def selected_files(is_remove=False):
-            if not self.thread_check(self.active_processing_thread):
-                items_list = [input_files_listbox_Option.get(i) for i in input_files_listbox_Option.curselection()]
-                inputPaths = list(self.inputPaths)# if is_remove else items_list
-                if is_remove:
-                    [inputPaths.remove(i) for i in items_list if items_list]
-                else:
-                    [inputPaths.remove(i) for i in self.inputPaths if i not in items_list]
-                removed_files = list_diff(self.inputPaths, inputPaths)
-                [input_files_listbox_Option.delete(input_files_listbox_Option.get(0, tk.END).index(i)) for i in removed_files]
-                starting_len = len(self.inputPaths)
-                self.inputPaths = tuple(inputPaths)
-                self.update_inputPaths()
-                audio_input_total()
-                input_info_text_var.set(f'{starting_len - len(self.inputPaths)} input(s) removed.')
-            else:
-                input_info_text_var.set('You cannot remove inputs during an active process.')
-            
-        def box_size():
-            input_info_text_var.set('')
-            input_files_listbox_Option.config(width=230, height=25) if is_widen_box_var.get() else input_files_listbox_Option.config(width=110, height=17)
-            self.menu_placement(menu_view_inputs_top, 'Selected Inputs', pop_up=True)
-
-        def input_options(is_select_inputs=True):
-            input_info_text_var.set('')
-            if is_select_inputs:
-                self.input_select_filedialog()
-            else:
-                self.inputPaths = ()
-            reset_list()
-            self.update_inputPaths()
-            audio_input_total()
-
-        def pop_open_file_path(is_play_file=False):
-            if self.inputPaths:
-                track_selected = self.inputPaths[input_files_listbox_Option.index(tk.ACTIVE)]
-                if os.path.isfile(track_selected):
-                    OPEN_FILE_func(track_selected if is_play_file else os.path.dirname(track_selected))
-        
-        def get_export_dir():
-            if os.path.isdir(self.export_path_var.get()):
-                export_dir = self.export_path_var.get()
-            else:
-                export_dir = self.export_select_filedialog()
-
-            return export_dir
-        
-        def verify_audio(is_create_samples=False):
-            inputPaths = list(self.inputPaths)
-            iterated_list = self.inputPaths if not is_create_samples else [input_files_listbox_Option.get(i) for i in input_files_listbox_Option.curselection()]
-            removed_files = []
-            export_dir = None
-            total_audio_count, current_file = len(iterated_list), 0
-            if iterated_list:
-                for i in iterated_list:
-                    current_file += 1
-                    input_info_text_var.set(f'{SAMPLE_BEGIN if is_create_samples else VERIFY_BEGIN}{current_file}/{total_audio_count}')
-                    if is_create_samples:
-                        export_dir = get_export_dir()
-                        if not export_dir:
-                            input_info_text_var.set('No export directory selected.')
-                            return
-                    is_good, error_data = self.verify_audio(i, is_process=False, sample_path=export_dir)
-                    if not is_good:
-                        inputPaths.remove(i)
-                        removed_files.append(error_data)#sample = self.create_sample(i)
-                        
-                varification_text_var.set(VERIFY_INPUTS_TEXT)
-                input_files_listbox_Option.configure(state=tk.NORMAL)
-                
-                if removed_files:
-                    input_info_text_var.set(f'{len(removed_files)} {BROKEN_OR_INCOM_TEXT}')
-                    error_text = ''
-                    for i in removed_files:
-                        error_text += i
-                    removed_files = list_diff(self.inputPaths, inputPaths)
-                    [input_files_listbox_Option.delete(input_files_listbox_Option.get(0, tk.END).index(i)) for i in removed_files]
-                    self.error_log_var.set(REMOVED_FILES(list_to_string(removed_files), error_text))
-                    self.inputPaths = tuple(inputPaths)
-                    self.update_inputPaths()
-                else:
-                    input_info_text_var.set('No errors found!')
-                    
-                audio_input_total()
-            else:
-                input_info_text_var.set(f'{NO_FILES_TEXT} {SELECTED_VER if is_create_samples else DETECTED_VER}')
-                varification_text_var.set(VERIFY_INPUTS_TEXT)
-                input_files_listbox_Option.configure(state=tk.NORMAL)
-                return
-            
-            audio_input_total()
-            
-        def verify_audio_start_thread(is_create_samples=False):
-            
-            if not self.thread_check(self.active_processing_thread):
-                if not self.thread_check(self.verification_thread):
-                    varification_text_var.set('Stop Progress')
-                    input_files_listbox_Option.configure(state=tk.DISABLED)
-                    self.verification_thread = KThread(target=lambda:verify_audio(is_create_samples=is_create_samples))
-                    self.verification_thread.start()
-                else:
-                    input_files_listbox_Option.configure(state=tk.NORMAL)
-                    varification_text_var.set(VERIFY_INPUTS_TEXT)
-                    input_info_text_var.set('Process Stopped')
-                    self.verification_thread.kill()
-            else:
-                input_info_text_var.set('You cannot verify inputs during an active process.')
-
-        def right_click_menu(event):
-                right_click_menu = tk.Menu(self, font=(MAIN_FONT_NAME, FONT_SIZE_1), tearoff=0)
-                right_click_menu.add_command(label='Remove Selected Items Only', command=lambda:selected_files(is_remove=True))
-                right_click_menu.add_command(label='Keep Selected Items Only', command=lambda:selected_files(is_remove=False))
-                right_click_menu.add_command(label='Clear All Input(s)', command=lambda:input_options(is_select_inputs=False))
-                right_click_menu.add_separator()
-                right_click_menu_sub = tk.Menu(right_click_menu, font=(MAIN_FONT_NAME, FONT_SIZE_1), tearoff=False)
-                right_click_menu.add_command(label='Verify and Create Samples of Selected Inputs', command=lambda:verify_audio_start_thread(is_create_samples=True))
-                right_click_menu.add_cascade(label='Preferred Double Click Action', menu=right_click_menu_sub)
-                if is_play_file_var.get():
-                    right_click_menu_sub.add_command(label='Enable: Open Audio File Directory', command=lambda:(input_files_listbox_Option.bind('<Double-Button>', lambda e:pop_open_file_path()), is_play_file_var.set(False)))
-                else:
-                    right_click_menu_sub.add_command(label='Enable: Open Audio File', command=lambda:(input_files_listbox_Option.bind('<Double-Button>', lambda e:pop_open_file_path(is_play_file=True)), is_play_file_var.set(True)))
-
-                try:
-                    right_click_menu.tk_popup(event.x_root,event.y_root)
-                    right_click_release_linux(right_click_menu, menu_view_inputs_top)
-                finally:
-                    right_click_menu.grab_release()
-
-        menu_view_inputs_Frame = self.menu_FRAME_SET(menu_view_inputs_top)
-        menu_view_inputs_Frame.grid(row=0)  
-
-        self.main_window_LABEL_SET(menu_view_inputs_Frame, SELECTED_INPUTS).grid(row=0,column=0,padx=0,pady=MENU_PADDING_1)
-        tk.Label(menu_view_inputs_Frame, textvariable=input_length_var, font=(MAIN_FONT_NAME, f"{FONT_SIZE_1}"), foreground=FG_COLOR).grid(row=1, column=0, padx=0, pady=MENU_PADDING_1)
-        if not OPERATING_SYSTEM == "Linux":
-            ttk.Button(menu_view_inputs_Frame, text=SELECT_INPUTS, command=lambda:input_options()).grid(row=2,column=0,padx=0,pady=MENU_PADDING_2)
-        input_files_listbox_Option = tk.Listbox(menu_view_inputs_Frame, selectmode=tk.EXTENDED, activestyle='dotbox', font=(MAIN_FONT_NAME, f"{FONT_SIZE_1}"), background='#101414', exportselection=0, width=110, height=17, relief=tk.SOLID, borderwidth=0)
-        input_files_listbox_vertical_scroll = ttk.Scrollbar(menu_view_inputs_Frame, orient=tk.VERTICAL)
-        input_files_listbox_Option.config(yscrollcommand=input_files_listbox_vertical_scroll.set)
-        input_files_listbox_vertical_scroll.configure(command=input_files_listbox_Option.yview)
-        input_files_listbox_Option.grid(row=4, sticky=tk.W)
-        input_files_listbox_vertical_scroll.grid(row=4, column=1, sticky=tk.NS)
-
-        tk.Label(menu_view_inputs_Frame, textvariable=input_info_text_var, font=(MAIN_FONT_NAME, f"{FONT_SIZE_1}"), foreground=FG_COLOR).grid(row=5, column=0, padx=0, pady=0)
-        ttk.Checkbutton(menu_view_inputs_Frame, text=WIDEN_BOX, variable=is_widen_box_var, command=lambda:box_size()).grid(row=6,column=0,padx=0,pady=0)
-        verify_audio_Button = ttk.Button(menu_view_inputs_Frame, textvariable=varification_text_var, command=lambda:verify_audio_start_thread())
-        verify_audio_Button.grid(row=7,column=0,padx=0,pady=MENU_PADDING_1)
-        ttk.Button(menu_view_inputs_Frame, text=CLOSE_WINDOW, command=lambda:menu_view_inputs_top.destroy()).grid(row=8,column=0,padx=0,pady=MENU_PADDING_1)
-
-        if is_dnd_compatible:
-            menu_view_inputs_top.drop_target_register(DND_FILES)
-            menu_view_inputs_top.dnd_bind('<<Drop>>', lambda e: drag_n_drop(e))
-        input_files_listbox_Option.bind(right_click_button, lambda e:right_click_menu(e))
-        input_files_listbox_Option.bind('<Double-Button>', lambda e:pop_open_file_path())
-        input_files_listbox_Option.bind('<Delete>', lambda e:selected_files(is_remove=True))
-        input_files_listbox_Option.bind('<BackSpace>', lambda e:selected_files(is_remove=False))
-
-        reset_list()
-
-        self.menu_placement(menu_view_inputs_top, 'Selected Inputs', pop_up=True)
-
     def menu_batch_dual(self):
         menu_batch_dual_top = tk.Toplevel(root)
         
@@ -3109,13 +2900,13 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             self.check_dual_paths()
             menu_batch_dual_top.destroy()
 
-        menu_view_inputs_Frame = self.menu_FRAME_SET(menu_batch_dual_top)
-        menu_view_inputs_Frame.grid(row=0)
+        batch_dual_frame = self.menu_FRAME_SET(menu_batch_dual_top)
+        batch_dual_frame.grid(row=0)
         
-        left_frame = ListboxBatchFrame(menu_view_inputs_Frame, self.file_one_sub_var.get().title(), move_entry, self.right_img, self.img_mapper)
+        left_frame = ListboxBatchFrame(batch_dual_frame, self.file_one_sub_var.get().title(), move_entry, self.right_img, self.img_mapper)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
-        right_frame = ListboxBatchFrame(menu_view_inputs_Frame, self.file_two_sub_var.get().title(), lambda:move_entry(False), self.left_img, self.img_mapper)
+        right_frame = ListboxBatchFrame(batch_dual_frame, self.file_two_sub_var.get().title(), lambda:move_entry(False), self.left_img, self.img_mapper)
         right_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
 
         left_frame.listbox.drop_target_register(DND_FILES)
@@ -3125,13 +2916,13 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         left_frame.listbox.dnd_bind(right_click_button, lambda e: clear_all(e, FILE_1_LB))
         right_frame.listbox.dnd_bind(right_click_button, lambda e: clear_all(e, FILE_2_LB))
 
-        menu_view_inputs_bottom_Frame = self.menu_FRAME_SET(menu_batch_dual_top)
-        menu_view_inputs_bottom_Frame.grid(row=1)
+        batch_dual_buttons = self.menu_FRAME_SET(menu_batch_dual_top)
+        batch_dual_buttons.grid(row=1)
         
-        confirm_btn = ttk.Button(menu_view_inputs_bottom_Frame, text=CONFIRM_ENTRIES, command=gather_input_list)
+        confirm_btn = ttk.Button(batch_dual_buttons, text=CONFIRM_ENTRIES, command=gather_input_list)
         confirm_btn.grid(pady=MENU_PADDING_1)
         
-        close_btn = ttk.Button(menu_view_inputs_bottom_Frame, text=CLOSE_WINDOW, command=lambda:menu_batch_dual_top.destroy())
+        close_btn = ttk.Button(batch_dual_buttons, text=CLOSE_WINDOW, command=lambda:menu_batch_dual_top.destroy())
         close_btn.grid(pady=MENU_PADDING_1)
 
         if self.check_dual_paths():

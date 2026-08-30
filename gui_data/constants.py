@@ -479,7 +479,6 @@ MDX_MENU ='MDX-Net Menu'
 ENSEMBLE_MENU ='Ensemble Menu'
 HELP_MENU ='Help Menu'
 ERROR_MENU ='Error Log'
-INPUTS_MENU ='Inputs Menu'
 ALIGN_MENU ='Align Menu'
 
 # Audio Player
