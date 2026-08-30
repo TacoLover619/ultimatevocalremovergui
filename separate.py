@@ -78,6 +78,33 @@ def clear_gpu_cache():
 warnings.filterwarnings("ignore")
 cpu = torch.device('cpu')
 
+
+def load_mdx_checkpoint(model_path, device):
+    checkpoint = torch.load(
+        model_path,
+        map_location='cpu',
+        weights_only=True,
+    )
+    if not isinstance(checkpoint, dict):
+        raise ValueError('MDX checkpoint must contain a dictionary')
+
+    try:
+        model_params = checkpoint['hyper_parameters']
+        state_dict = checkpoint['state_dict']
+    except KeyError as error:
+        raise ValueError(
+            f'MDX checkpoint is missing required {error.args[0]!r} data'
+        ) from error
+
+    if not isinstance(model_params, dict):
+        raise ValueError('MDX checkpoint "hyper_parameters" must be a dictionary')
+    if not isinstance(state_dict, dict):
+        raise ValueError('MDX checkpoint "state_dict" must be a dictionary')
+
+    model = MdxnetSet.ConvTDFNet(**model_params)
+    model.load_state_dict(state_dict)
+    return model_params, model.to(device).eval()
+
 class SeperateAttributes:
     def __init__(self, model_data: ModelData, 
                  process_data: dict, 
@@ -494,14 +521,11 @@ class SeperateMDX(SeperateAttributes):
             self.start_inference_console_write()
 
             if self.is_mdx_ckpt:
-                model_params = torch.load(
+                model_params, self.model_run = load_mdx_checkpoint(
                     self.model_path,
-                    map_location=lambda storage, loc: storage,
-                    weights_only=True,
-                )['hyper_parameters']
+                    self.device,
+                )
                 self.dim_c, self.hop = model_params['dim_c'], model_params['hop_length']
-                separator = MdxnetSet.ConvTDFNet(**model_params)
-                self.model_run = separator.load_from_checkpoint(self.model_path).to(self.device).eval()
             else:
                 if self.mdx_segment_size == self.dim_t and not self.is_other_gpu:
                     ort_ = ort.InferenceSession(self.model_path, providers=self.run_type)
