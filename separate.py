@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 
@@ -37,15 +38,11 @@ import gzip
 import librosa
 import math
 import numpy as np
-import onnxruntime as ort
 import warnings
 import pydub
 import soundfile as sf
 import lib_v5.mdxnet as MdxnetSet
-import math
 #import random
-from onnx import load
-from onnx2pytorch import ConvertModel
 import gc
  
 if TYPE_CHECKING:
@@ -115,12 +112,50 @@ def normalize_spectrogram(magnitude):
     return magnitude
 
 
+def build_vr_windows(magnitude, patches, roi_size, window_size):
+    return np.asarray([
+        magnitude[:, :, index * roi_size:index * roi_size + window_size]
+        for index in range(patches)
+    ])
+
+
+def predict_vr_mask(model, windows, batch_size, device, on_batch=None, error_message=None):
+    masks = []
+    with torch.inference_mode():
+        for start in range(0, len(windows), batch_size):
+            if on_batch is not None:
+                on_batch()
+            batch = torch.from_numpy(windows[start:start + batch_size]).to(device)
+            prediction = model.predict_mask(batch)
+            if error_message and prediction.shape[3] <= 0:
+                raise ValueError(error_message)
+            masks.append(np.concatenate(prediction.detach().cpu().numpy(), axis=2))
+
+    if not masks:
+        raise ValueError(error_message or 'VR inference produced no patches')
+    return np.concatenate(masks, axis=2)
+
+
 def backend_output_to_tensor(output, device):
     return torch.as_tensor(output, device=device)
 
 
+def convert_onnx_model(model_path):
+    """Load the optional ONNX conversion stack only when MDX-C needs it."""
+    from onnx import load
+    from onnx2pytorch import ConvertModel
+
+    return ConvertModel(load(model_path))
+
+
+def get_onnxruntime():
+    import onnxruntime
+
+    return onnxruntime
+
+
 def select_onnx_providers(use_cuda):
-    available_providers = ort.get_available_providers()
+    available_providers = get_onnxruntime().get_available_providers()
     if use_cuda and 'CUDAExecutionProvider' in available_providers:
         return ['CUDAExecutionProvider', 'CPUExecutionProvider']
     return ['CPUExecutionProvider']
@@ -548,10 +583,13 @@ class SeperateMDX(SeperateAttributes):
                 self.dim_c, self.hop = model_params['dim_c'], model_params['hop_length']
             else:
                 if self.mdx_segment_size == self.dim_t and not self.is_other_gpu:
-                    ort_ = ort.InferenceSession(self.model_path, providers=self.run_type)
+                    ort_ = get_onnxruntime().InferenceSession(
+                        self.model_path,
+                        providers=self.run_type,
+                    )
                     self.model_run = lambda spek:ort_.run(None, {'input': spek.cpu().numpy()})[0]
                 else:
-                    self.model_run = ConvertModel(load(self.model_path))
+                    self.model_run = convert_onnx_model(self.model_path)
                     self.model_run.to(self.device).eval()
 
             self.running_inference_console_write()
@@ -845,7 +883,7 @@ class SeperateMDXC(SeperateAttributes):
             sources = {k: pitch_fix(v) if self.is_pitch_change else v for k, v in zip(self.mdx_c_configs.training.instruments, estimated_sources.cpu().detach().numpy())}
             del estimated_sources
             if self.is_denoise_model:
-                if VOCAL_STEM in sources.keys() and INST_STEM in sources.keys():
+                if VOCAL_STEM in sources and INST_STEM in sources:
                     sources[VOCAL_STEM] = vr_denoiser(sources[VOCAL_STEM], self.device, model_path=self.DENOISER_MODEL)
                     if sources[VOCAL_STEM].shape[1] != org_mix.shape[1]:
                         sources[VOCAL_STEM] = spec_utils.match_array_shapes(sources[VOCAL_STEM], org_mix)
@@ -881,11 +919,14 @@ class SeperateDemucs(SeperateAttributes):
 
         if is_no_cache:
             if self.demucs_version == DEMUCS_V1:
-                if str(self.model_path).endswith(".gz"):
-                    self.model_path = gzip.open(self.model_path, "rb")
                 # Legacy Demucs v1 packages serialize their model class. Only load
                 # model files obtained from UVR's trusted model repository.
-                klass, args, kwargs, state = torch.load(self.model_path, weights_only=False)
+                if str(self.model_path).endswith(".gz"):
+                    with gzip.open(self.model_path, "rb") as model_file:
+                        package = torch.load(model_file, weights_only=False)
+                else:
+                    package = torch.load(self.model_path, weights_only=False)
+                klass, args, kwargs, state = package
                 self.demucs = klass(*args, **kwargs)
                 self.demucs.to(self.device) 
                 self.demucs.load_state_dict(state)
@@ -1206,36 +1247,29 @@ class SeperateVR(SeperateAttributes):
 
     def inference_vr(self, X_spec, device, aggressiveness):
         def _execute(X_mag_pad, roi_size):
-            X_dataset = []
             patches = (X_mag_pad.shape[2] - 2 * self.model_run.offset) // roi_size
-            total_iterations = patches//self.batch_size if not self.is_tta else (patches//self.batch_size)*2
-            for i in range(patches):
-                start = i * roi_size
-                X_mag_window = X_mag_pad[:, :, start:start + self.window_size]
-                X_dataset.append(X_mag_window)
-
-            X_dataset = np.asarray(X_dataset)
+            batch_iterations = max(1, math.ceil(patches / self.batch_size))
+            total_iterations = batch_iterations * (2 if self.is_tta else 1)
+            X_dataset = build_vr_windows(
+                X_mag_pad,
+                patches,
+                roi_size,
+                self.window_size,
+            )
             self.model_run.eval()
-            with torch.no_grad():
-                mask = []
-                for i in range(0, patches, self.batch_size):
-                    self.progress_value += 1
-                    if self.progress_value >= total_iterations:
-                        self.progress_value = total_iterations
-                    self.set_progress_bar(0.1, 0.8/total_iterations*self.progress_value)
-                    X_batch = X_dataset[i: i + self.batch_size]
-                    X_batch = torch.from_numpy(X_batch).to(device)
-                    pred = self.model_run.predict_mask(X_batch)
-                    if not pred.size()[3] > 0:
-                        raise Exception(ERROR_MAPPER[WINDOW_SIZE_ERROR])
-                    pred = pred.detach().cpu().numpy()
-                    pred = np.concatenate(pred, axis=2)
-                    mask.append(pred)
-                if len(mask) == 0:
-                    raise Exception(ERROR_MAPPER[WINDOW_SIZE_ERROR])
-                
-                mask = np.concatenate(mask, axis=2)
-            return mask
+
+            def update_progress():
+                self.progress_value = min(self.progress_value + 1, total_iterations)
+                self.set_progress_bar(0.1, 0.8 / total_iterations * self.progress_value)
+
+            return predict_vr_mask(
+                self.model_run,
+                X_dataset,
+                self.batch_size,
+                device,
+                on_batch=update_progress,
+                error_message=ERROR_MAPPER[WINDOW_SIZE_ERROR],
+            )
 
         def postprocess(mask, X_mag, X_phase):
             is_non_accom_stem = False
@@ -1445,9 +1479,12 @@ def pitch_shift(mix):
     
     return resampled_audio
 
-def list_to_dictionary(lst):
-    dictionary = {item: index for index, item in enumerate(lst)}
-    return dictionary
+@lru_cache(maxsize=4)
+def load_vr_denoiser_model(model_path, modified_time, device, n_fft, nout, nout_lstm):
+    model = nets_new.CascadedNet(n_fft, nout=nout, nout_lstm=nout_lstm)
+    model.load_state_dict(torch.load(model_path, map_location=cpu, weights_only=True))
+    return model.to(torch.device(device)).eval()
+
 
 def vr_denoiser(X, device, hop_length=1024, n_fft=2048, cropsize=256, is_deverber=False, model_path=None):
     batchsize = 4
@@ -1461,9 +1498,15 @@ def vr_denoiser(X, device, hop_length=1024, n_fft=2048, cropsize=256, is_deverbe
         hop_length=1024
         nout, nout_lstm = 16, 128
     
-    model = nets_new.CascadedNet(n_fft, nout=nout, nout_lstm=nout_lstm)
-    model.load_state_dict(torch.load(model_path, map_location=cpu, weights_only=True))
-    model.to(device)
+    resolved_model_path = os.path.abspath(model_path)
+    model = load_vr_denoiser_model(
+        resolved_model_path,
+        os.path.getmtime(resolved_model_path),
+        str(device),
+        n_fft,
+        nout,
+        nout_lstm,
+    )
 
     if mp is None:
         X_spec = spec_utils.wave_to_spectrogram_old(X, hop_length, n_fft)
@@ -1480,31 +1523,9 @@ def vr_denoiser(X, device, hop_length=1024, n_fft=2048, cropsize=256, is_deverbe
     X_mag_pad = np.pad(X_mag, ((0, 0), (0, 0), (pad_l, pad_r)), mode='constant')
     normalize_spectrogram(X_mag_pad)
 
-    X_dataset = []
     patches = (X_mag_pad.shape[2] - 2 * model.offset) // roi_size
-    for i in range(patches):
-        start = i * roi_size
-        X_mag_crop = X_mag_pad[:, :, start:start + cropsize]
-        X_dataset.append(X_mag_crop)
-
-    X_dataset = np.asarray(X_dataset)
-
-    model.eval()
-    
-    with torch.no_grad():
-        mask = []
-        # To reduce the overhead, dataloader is not used.
-        for i in range(0, patches, batchsize):
-            X_batch = X_dataset[i: i + batchsize]
-            X_batch = torch.from_numpy(X_batch).to(device)
-
-            pred = model.predict_mask(X_batch)
-
-            pred = pred.detach().cpu().numpy()
-            pred = np.concatenate(pred, axis=2)
-            mask.append(pred)
-
-        mask = np.concatenate(mask, axis=2)
+    X_dataset = build_vr_windows(X_mag_pad, patches, roi_size, cropsize)
+    mask = predict_vr_mask(model, X_dataset, batchsize, device)
     
     mask = mask[:, :, :n_frame]
 

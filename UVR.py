@@ -25,9 +25,8 @@ import urllib.request
 import webbrowser
 import wget
 import traceback
-import matchering as match
 import tkinter as tk
-import tkinter.ttk as ttk
+from tkinter import ttk
 from tkinter.font import Font
 from tkinter import filedialog
 from tkinter import messagebox
@@ -41,6 +40,7 @@ from gui_data.constants import *
 from gui_data.app_size_values import *
 from gui_data.error_handling import error_text, error_dialouge
 from gui_data.old_data_check import file_check, remove_unneeded_yamls, remove_temps
+from gui_data.update_checker import get_latest_release, update_available
 from gui_data.tkinterdnd2 import TkinterDnD, DND_FILES
 from lib_v5.vr_network.model_param_init import ModelParameters
 from kthread import KThread
@@ -52,13 +52,10 @@ from separate import (
     cuda_available, mps_available, #directml_available,
 )
 from playsound import playsound
-from typing import List
-import onnx
 import re
 import sys
 import yaml
 from ml_collections import ConfigDict
-from collections import Counter
 
 # if not is_macos:
 #     import torch_directml
@@ -92,8 +89,6 @@ def get_execution_time(function, name):
     end = time.time()
     time_difference = end - start
     print(f'{name} Execution Time: ', time_difference)
-
-PREVIOUS_PATCH_WIN = 'UVR_Patch_10_6_23_4_27'
 
 is_dnd_compatible = True
 banner_placement = -2
@@ -153,7 +148,7 @@ def close_process(q:queue.Queue):
                     try:
                         with open(SPLASH_DOC, 'w') as f:
                             f.write('1')
-                    except:
+                    except Exception:
                         print('No splash screen.')
 
     thread = KThread(target=close_splash)
@@ -327,7 +322,7 @@ def drop(event, accept_mode: str = 'files'):
     else:
         return    
 
-class ModelData():
+class ModelData:
     def __init__(self, model_name: str, 
                  selected_process_method=ENSEMBLE_MODE, 
                  is_secondary_model=False, 
@@ -651,7 +646,7 @@ class ModelData():
         else:
             self.model_path = os.path.join(MDX_MODELS_DIR, f"{self.model_name}{ext}")
             
-        self.mixer_path = os.path.join(MDX_MODELS_DIR, f"mixer_val.ckpt")
+        self.mixer_path = os.path.join(MDX_MODELS_DIR, "mixer_val.ckpt")
     
     def get_demucs_model_path(self):
         
@@ -738,7 +733,7 @@ class ModelData():
                     with open(self.model_path, 'rb') as f:
                         f.seek(- 10000 * 1024, 2)
                         self.model_hash = hashlib.md5(f.read()).hexdigest()
-                except:
+                except Exception:
                     self.model_hash = hashlib.md5(open(self.model_path,'rb').read()).hexdigest()
                     
                 table_entry = {self.model_path: self.model_hash}
@@ -746,7 +741,7 @@ class ModelData():
                 
         #print(self.model_name," - ", self.model_hash)
 
-class Ensembler():
+class Ensembler:
     def __init__(self, is_manual_ensemble=False):
         self.is_save_all_outputs_ensemble = root.is_save_all_outputs_ensemble_var.get()
         chosen_ensemble_name = '{}'.format(root.chosen_ensemble_var.get().replace(" ", "_")) if not root.chosen_ensemble_var.get() == CHOOSE_ENSEMBLE_OPTION else 'Ensembled'
@@ -757,7 +752,7 @@ class Ensembler():
         self.main_export_path = Path(root.export_path_var.get())
         self.chosen_ensemble = f"_{chosen_ensemble_name}" if root.is_append_ensemble_name_var.get() else ''
         ensemble_folder_name = self.main_export_path if self.is_save_all_outputs_ensemble else ENSEMBLE_TEMP_PATH
-        self.ensemble_folder_name = os.path.join(ensemble_folder_name, '{}_Outputs_{}'.format(chosen_ensemble_name, time_stamp))
+        self.ensemble_folder_name = os.path.join(ensemble_folder_name, f'{chosen_ensemble_name}_Outputs_{time_stamp}')
         self.is_testing_audio = f"{time_stamp}_" if root.is_testing_audio_var.get() else ''
         self.primary_algorithm = ensemble_algorithm[0]
         self.secondary_algorithm = ensemble_algorithm[2]
@@ -787,7 +782,7 @@ class Ensembler():
 
         stem_outputs = self.get_files_to_ensemble(folder=export_path, prefix=audio_file_base, suffix=f"_({stem_tag}).wav")
         audio_file_output = f"{self.is_testing_audio}{audio_file_base}{self.chosen_ensemble}_({stem_tag})"
-        stem_save_path = os.path.join('{}'.format(self.main_export_path),'{}.wav'.format(audio_file_output))
+        stem_save_path = os.path.join(f'{self.main_export_path}',f'{audio_file_output}.wav')
         
         #print("get_files_to_ensemble: ", stem_outputs)
         
@@ -811,7 +806,7 @@ class Ensembler():
         is_mv_sep = True
         
         if is_bulk:
-            number_list = list(set([os.path.basename(i).split("_")[0] for i in audio_inputs]))
+            number_list = list({os.path.basename(i).split("_")[0] for i in audio_inputs})
             for n in number_list:
                 current_list = [i for i in audio_inputs if os.path.basename(i).startswith(n)]
                 audio_file_base = os.path.basename(current_list[0]).split('.wav')[0]
@@ -827,7 +822,7 @@ class Ensembler():
         
         algorithm = root.choose_algorithm_var.get()
         algorithm_text = "" if is_bulk else f"_({root.choose_algorithm_var.get()})"
-        stem_save_path = os.path.join('{}'.format(self.main_export_path),'{}{}{}.wav'.format(self.is_testing_audio, audio_file_base, algorithm_text))
+        stem_save_path = os.path.join(f'{self.main_export_path}',f'{self.is_testing_audio}{audio_file_base}{algorithm_text}.wav')
         spec_utils.ensemble_inputs(audio_inputs, algorithm, self.is_normalization, self.wav_type_set, stem_save_path, is_wave=self.is_wav_ensemble)
         save_format(stem_save_path, self.save_format, self.mp3_bit_set)
 
@@ -843,7 +838,7 @@ class Ensembler():
                                  self.wav_type_set,
                                  save_format=save_format_)
 
-class AudioTools():
+class AudioTools:
     def __init__(self, audio_tool):
         time_stamp = round(time.time())
         self.audio_tool = audio_tool
@@ -866,8 +861,8 @@ class AudioTools():
         audio_file_base = f"{self.is_testing_audio}{audio_file_base}"
         audio_file_2_base = f"{self.is_testing_audio}{audio_file_2_base}"
         
-        aligned_path = os.path.join('{}'.format(self.main_export_path),'{}_(Aligned).wav'.format(audio_file_2_base))
-        inverted_path = os.path.join('{}'.format(self.main_export_path),'{}_(Inverted).wav'.format(audio_file_base))
+        aligned_path = os.path.join(f'{self.main_export_path}',f'{audio_file_2_base}_(Aligned).wav')
+        inverted_path = os.path.join(f'{self.main_export_path}',f'{audio_file_base}_(Inverted).wav')
 
         spec_utils.align_audio(audio_inputs[0], 
                                audio_inputs[1], 
@@ -887,13 +882,14 @@ class AudioTools():
                                is_spec_match=self.is_spec_match)
         
     def match_inputs(self, audio_inputs, audio_file_base, command_Text):
+        import matchering as match
         
         target = audio_inputs[0]
         reference = audio_inputs[1]
         
-        command_Text(f"Processing... ")
+        command_Text("Processing... ")
         
-        save_path = os.path.join('{}'.format(self.main_export_path),'{}_(Matched).wav'.format(f"{self.is_testing_audio}{audio_file_base}"))
+        save_path = os.path.join(f'{self.main_export_path}','{}_(Matched).wav'.format(f"{self.is_testing_audio}{audio_file_base}"))
         
         match.process(
             target=target,
@@ -920,7 +916,7 @@ class AudioTools():
         save_path = os.path.join(self.main_export_path, f"{self.is_testing_audio}{audio_file_base}{file_text}.wav")
         spec_utils.augment_audio(save_path, audio_file, rate, self.is_normalization, self.wav_type_set, self.save_format, is_pitch=is_pitch, is_time_correction=is_time_correction)
    
-class ToolTip(object):
+class ToolTip:
 
     def __init__(self, widget):
         self.widget = widget
@@ -1219,7 +1215,7 @@ class ComboBoxMenu(ttk.Combobox):
             max_string = max(option_list, key=len)
             font = Font(font=self.cget('font'))
             width_in_pixels = font.measure(max_string) - offset
-            width_in_pixels = 0 if width_in_pixels < 0 else width_in_pixels
+            width_in_pixels = max(width_in_pixels, 0)
         else:
             width_in_pixels = 0
         
@@ -1308,11 +1304,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         self.withdraw()
         self.title('Ultimate Vocal Remover')
         # Set Geometry and Center Window
-        self.geometry('{width}x{height}+{xpad}+{ypad}'.format(
-            width=self.main_window_width,
-            height=height,
-            xpad=int(self.winfo_screenwidth()/2 - width/2),
-            ypad=int(self.winfo_screenheight()/2 - height/2 - 30)))
+        self.geometry(f'{self.main_window_width}x{height}+{int(self.winfo_screenwidth()/2 - width/2)}+{int(self.winfo_screenheight()/2 - height/2 - 30)}')
  
         self.iconbitmap(ICON_IMG_PATH) if is_windows else self.tk.call('wm', 'iconphoto', self._w, tk.PhotoImage(file=MAIN_ICON_IMG_PATH))
         self.protocol("WM_DELETE_WINDOW", self.save_values)
@@ -1574,12 +1566,12 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             missing_models = [model.model_status for model in model_data if not model.model_status]
             
             if missing_models or not model_data:
-                model_data: List[ModelData] = [ModelData(model_name, is_dry_check=is_dry_check) for model_name in self.ensemble_model_list]
+                model_data: list[ModelData] = [ModelData(model_name, is_dry_check=is_dry_check) for model_name in self.ensemble_model_list]
                 self.model_data_table = model_data
 
         if arch_type == KARAOKEE_CHECK:
             model_list = []
-            model_data: List[ModelData] = [ModelData(model_name, is_dry_check=is_dry_check) for model_name in self.default_change_model_list]
+            model_data: list[ModelData] = [ModelData(model_name, is_dry_check=is_dry_check) for model_name in self.default_change_model_list]
             for model in model_data:
                 if model.model_status and model.is_karaoke or model.is_bv_model:
                     model_list.append(model.model_and_process_tag)
@@ -1587,15 +1579,15 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             return model_list
 
         if arch_type == ENSEMBLE_MODE:
-            model_data: List[ModelData] = [ModelData(model_name) for model_name in self.ensemble_listbox_get_all_selected_models()]
+            model_data: list[ModelData] = [ModelData(model_name) for model_name in self.ensemble_listbox_get_all_selected_models()]
         if arch_type == ENSEMBLE_CHECK:
-            model_data: List[ModelData] = [ModelData(model, is_change_def=is_change_def, is_get_hash_dir_only=is_get_hash_dir_only)]
+            model_data: list[ModelData] = [ModelData(model, is_change_def=is_change_def, is_get_hash_dir_only=is_get_hash_dir_only)]
         if arch_type == VR_ARCH_TYPE or arch_type == VR_ARCH_PM:
-            model_data: List[ModelData] = [ModelData(model, VR_ARCH_TYPE)]
+            model_data: list[ModelData] = [ModelData(model, VR_ARCH_TYPE)]
         if arch_type == MDX_ARCH_TYPE:
-            model_data: List[ModelData] = [ModelData(model, MDX_ARCH_TYPE)]
+            model_data: list[ModelData] = [ModelData(model, MDX_ARCH_TYPE)]
         if arch_type == DEMUCS_ARCH_TYPE:
-            model_data: List[ModelData] = [ModelData(model, DEMUCS_ARCH_TYPE)]#
+            model_data: list[ModelData] = [ModelData(model, DEMUCS_ARCH_TYPE)]#
 
         return model_data
         
@@ -2089,7 +2081,13 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
     def focus_out_widgets(self, all_widgets, frame):
         for option in all_widgets:
             if not type(option) is ComboBoxEditableMenu:
-                option.bind('<Button-1>', lambda e:(option.focus(), self.combo_box_selection_clear(frame)))
+                option.bind(
+                    '<Button-1>',
+                    lambda e, widget=option: (
+                        widget.focus(),
+                        self.combo_box_selection_clear(frame),
+                    ),
+                )
 
     def bind_widgets(self):
         """Bind widgets to the drag & drop mechanic"""
@@ -2169,7 +2167,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         elif dialoge_type == CHOOSE_EXPORT_FIR:
             filenames = filedialog.askdirectory(
                                     parent=parent_win,
-                                    title=f'Select Folder',)
+                                    title='Select Folder',)
             
         if is_linux:
             print("Is Linux")
@@ -2262,7 +2260,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         """Deletes temp files"""
         
         DIRECTORIES = (BASE_PATH, VR_MODELS_DIR, MDX_MODELS_DIR, DEMUCS_MODELS_DIR, DEMUCS_NEWER_REPO_DIR)
-        EXTENSIONS = (('.aes', '.txt', '.tmp'))
+        EXTENSIONS = ('.aes', '.tmp')
         
         try:
             if os.path.isfile(f"{current_patch}{application_extension}"):
@@ -2328,9 +2326,10 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         result = []
 
         for model in stem_check:
-            if is_multi_stem:
-                result.append(model.model_and_process_tag)
-            elif is_4_stem_check and (model.demucs_stem_count == 4 or model.mdx_stem_count == 4):
+            if is_multi_stem or (
+                is_4_stem_check
+                and (model.demucs_stem_count == 4 or model.mdx_stem_count == 4)
+            ):
                 result.append(model.model_and_process_tag)
             elif matches_stem(model) or (not is_no_demucs and primary_stem.lower() in model.demucs_source_list):
                 if is_check_vocal_split:
@@ -2388,7 +2387,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 close_method()
             open_method()
         except Exception as e:
-            self.error_log_var.set("{}".format(error_text(menu, e)))
+            self.error_log_var.set(f"{error_text(menu, e)}")
 
     def input_right_click_menu(self, event):
 
@@ -2442,13 +2441,13 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
     def cached_model_source_holder(self, process_method, sources, model_name=None):
         
         if process_method == VR_ARCH_TYPE:
-            self.vr_cache_source_mapper = {**self.vr_cache_source_mapper, **{model_name: sources}}
+            self.vr_cache_source_mapper = {**self.vr_cache_source_mapper, model_name: sources}
         if process_method == MDX_ARCH_TYPE:
-            self.mdx_cache_source_mapper = {**self.mdx_cache_source_mapper, **{model_name: sources}}
+            self.mdx_cache_source_mapper = {**self.mdx_cache_source_mapper, model_name: sources}
         if process_method == DEMUCS_ARCH_TYPE:
-            self.demucs_cache_source_mapper = {**self.demucs_cache_source_mapper, **{model_name: sources}}
+            self.demucs_cache_source_mapper = {**self.demucs_cache_source_mapper, model_name: sources}
   
-    def cached_source_model_list_check(self, model_list: List[ModelData]):
+    def cached_source_model_list_check(self, model_list: list[ModelData]):
 
         model: ModelData
         primary_model_names = lambda process_method:[model.model_basename if model.process_method == process_method else None for model in model_list]
@@ -2504,7 +2503,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         try:
             with audioread.audio_open(audio_file) as f:
                 track_length = int(f.duration)
-        except Exception as e:
+        except Exception:
             print('Audioread failed to get duration. Trying Librosa...')
             y, sr = librosa.load(audio_file, mono=False, sr=44100)
             track_length = int(librosa.get_duration(y=y, sr=sr))
@@ -2532,10 +2531,10 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
     def right_click_select_settings_sub(self, parent_menu, process_method):
         saved_settings_sub_menu = tk.Menu(parent_menu, font=(MAIN_FONT_NAME, FONT_SIZE_1), tearoff=False)
         settings_options = self.last_found_settings + tuple(SAVE_SET_OPTIONS)
-        
-        for settings_options in settings_options:
-            settings_options = settings_options.replace("_", " ")
-            saved_settings_sub_menu.add_command(label=settings_options, command=lambda o=settings_options:self.selection_action_saved_settings(o, process_method=process_method))
+
+        for settings_option in settings_options:
+            settings_option = settings_option.replace("_", " ")
+            saved_settings_sub_menu.add_command(label=settings_option, command=lambda o=settings_option:self.selection_action_saved_settings(o, process_method=process_method))
 
         saved_settings_sub_menu.insert_separator(len(self.last_found_settings))
         
@@ -2913,7 +2912,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     if is_create_samples:
                         export_dir = get_export_dir()
                         if not export_dir:
-                            input_info_text_var.set(f'No export directory selected.')
+                            input_info_text_var.set('No export directory selected.')
                             return
                     is_good, error_data = self.verify_audio(i, is_process=False, sample_path=export_dir)
                     if not is_good:
@@ -2934,7 +2933,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                     self.inputPaths = tuple(inputPaths)
                     self.update_inputPaths()
                 else:
-                    input_info_text_var.set(f'No errors found!')
+                    input_info_text_var.set('No errors found!')
                     
                 audio_input_total()
             else:
@@ -3932,7 +3931,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         Link(place=4, 
              frame=more_info_tab_Frame, 
              text="Ultimate Vocal Remover (Official GitHub)", 
-             link="https://github.com/Anjok07/ultimatevocalremovergui", 
+             link="https://github.com/TacoLover619/ultimatevocalremovergui",
              description="You can find updates, report issues, and give us a shout via our official GitHub.",
              font=FONT_SIZE_1)
         
@@ -4289,7 +4288,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                         with urllib.request.urlopen(config_link) as response:
                             with open(config_local, 'wb') as out_file:
                                 out_file.write(response.read())
-                    except Exception as e:
+                    except Exception:
                         model_name = None
 
             #print(model_name)
@@ -4313,10 +4312,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             tooltip.showtip(INVALID_INPUT_E, True)
         
         def validation(value):
-            if re.fullmatch(modified_pattern, value) is None:
-                return False
-            else:
-                return True
+            return re.fullmatch(modified_pattern, value) is not None
         
         if not pattern:
             pattern = r'^[a-zA-Z0-9 -]{0,25}$'
@@ -4385,13 +4381,8 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         """Ask user is they want to update"""
         
         is_new_update = self.online_data_refresh(confirmation_box=True)
-        is_download_in_app_var = tk.BooleanVar(value=False)
-        
         def update_type():
-            if is_download_in_app_var.get():
-                self.download_item(is_update_app=True)
-            else:
-                webbrowser.open_new_tab(self.download_update_link_var.get())
+            webbrowser.open_new_tab(self.download_update_link_var.get())
 
             update_confirmation_win.destroy()
             
@@ -4414,10 +4405,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             no_button = ttk.Button(update_confirmation_Frame, text=NO_TEXT, command=lambda:(update_confirmation_win.destroy()))
             no_button.grid(row=3,column=0,padx=0,pady=MENU_PADDING_1)
             
-            if is_windows:
-                download_outside_application_button = ttk.Checkbutton(update_confirmation_Frame, variable=is_download_in_app_var, text='Download Update in Application')
-                download_outside_application_button.grid(row=4,column=0,padx=0,pady=MENU_PADDING_1)
-
             self.menu_placement(update_confirmation_win, CONFIRM_UPDATE_TEXT, pop_up=True)
 
     def pop_up_user_code_input(self):
@@ -4607,6 +4594,8 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         
         try:
             if model_path.endswith(ONNX):
+                import onnx
+
                 model = onnx.load(model_path)
                 model_shapes = [[d.dim_value for d in _input.type.tensor_type.shape.dim] for _input in model.graph.input][0]
                 dim_f = model_shapes[2]
@@ -4630,10 +4619,6 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                         primary_stem = INST_STEM if model_params['target_name'] == OTHER_STEM.lower() else stem
                 
         except Exception as e:
-            error_name = f'{type(e).__name__}'
-            traceback_text = ''.join(traceback.format_tb(e.__traceback__))
-            message = f'{error_name}: "{e}"\n{traceback_text}"'
-            #self.error_log_var.set(message)
             is_compatible_model = False
             if is_ckpt:
                 self.pop_up_mdx_c_param(mdx_model_hash)
@@ -5169,38 +5154,25 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 if refresh_list_Button:
                     self.download_progress_info_var.set('Download List Refreshed!')
 
-                if OPERATING_SYSTEM=="Darwin":
-                    self.lastest_version = self.online_data["current_version_mac"]
-                elif OPERATING_SYSTEM=="Linux":
-                    self.lastest_version = self.online_data["current_version_linux"]
-                else:
-                    self.lastest_version = self.online_data["current_version"]
-                    
-                if self.lastest_version == current_patch and not is_start_up:
+                try:
+                    latest_release = get_latest_release()
+                    self.lastest_version = latest_release['version']
+                    is_new_update = update_available(VERSION, self.lastest_version)
+                except Exception as release_error:
+                    latest_release = None
+                    is_new_update = False
+                    print(f'GitHub release check failed: {release_error}')
+
+                if not is_new_update and not is_start_up:
                     self.app_update_status_Text_var.set('UVR Version Current')
-                else:
-                    is_new_update = True
-                    is_beta_version = True if self.lastest_version == PREVIOUS_PATCH_WIN and BETA_VERSION in current_patch else False
-                    
+                elif is_new_update:
+                    self.download_update_link_var.set(latest_release['url'])
                     if not is_start_up:
-                        if is_beta_version:
-                            self.app_update_status_Text_var.set(f"Roll Back: {self.lastest_version}")
-                            self.app_update_button_Text_var.set(ROLL_BACK_TEXT)
-                        else:
-                            self.app_update_status_Text_var.set(f"Update Found: {self.lastest_version}")
-                            self.app_update_button_Text_var.set('Click Here to Update')
-                        
-                        if OPERATING_SYSTEM == "Windows":
-                            self.download_update_link_var.set('{}{}{}'.format(UPDATE_REPO, self.lastest_version, application_extension))
-                            self.download_update_path_var.set(os.path.join(BASE_PATH, f'{self.lastest_version}{application_extension}'))
-                        elif OPERATING_SYSTEM == "Darwin":
-                            self.download_update_link_var.set(UPDATE_MAC_ARM_REPO if SYSTEM_PROC == ARM or ARM in SYSTEM_ARCH else UPDATE_MAC_X86_64_REPO)
-                        elif OPERATING_SYSTEM == "Linux":
-                            self.download_update_link_var.set(UPDATE_LINUX_REPO)
-                    
+                        self.app_update_status_Text_var.set(f"Update Found: {self.lastest_version}")
+                        self.app_update_button_Text_var.set('Click Here to Update')
+
                     if not user_refresh:
-                        if not is_beta_version and not self.lastest_version == current_patch:
-                            self.command_Text.write(NEW_UPDATE_FOUND_TEXT(self.lastest_version))
+                        self.command_Text.write(NEW_UPDATE_FOUND_TEXT(self.lastest_version))
 
 
                 is_update_params = self.is_auto_update_model_params if is_start_up else self.is_auto_update_model_params_var.get()
@@ -5331,8 +5303,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                         
             self.download_demucs_models_list = list(dict.fromkeys(self.download_demucs_models_list)) 
         
-            for option_name in self.download_demucs_models_list:
-                model_download_demucs_list.append(option_name)
+            model_download_demucs_list.extend(self.download_demucs_models_list)
             
             configure_combobox(self.model_download_demucs_Option, model_download_demucs_list, self.model_download_demucs_var, DEMUCS_ARCH_TYPE, model_download_demucs_name)
 
@@ -5417,7 +5388,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         if type == VR_ARCH_TYPE:
             for selected_model in self.vr_download_list.items():
                 if selection in selected_model:
-                    self.download_link_path_var.set("{}{}".format(model_repo, selected_model[1]))
+                    self.download_link_path_var.set(f"{model_repo}{selected_model[1]}")
                     self.download_save_path_var.set(os.path.join(VR_MODELS_DIR, selected_model[1]))
                     break
                 
@@ -5428,7 +5399,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                         model_name = list(selected_model[1].keys())[0]
                     else:
                         model_name = str(selected_model[1])
-                    self.download_link_path_var.set("{}{}".format(model_repo, model_name))
+                    self.download_link_path_var.set(f"{model_repo}{model_name}")
                     self.download_save_path_var.set(os.path.join(MDX_MODELS_DIR, model_name))
                     break
 
@@ -5480,7 +5451,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 else:
                     if self.select_download_var.get() == DEMUCS_ARCH_TYPE and is_demucs_newer:
                         for model_num, model_data in enumerate(self.download_demucs_newer_models, start=1):
-                            self.download_progress_info_var.set('{} {}/{}...'.format(DOWNLOADING_ITEM, model_num, len(self.download_demucs_newer_models)))
+                            self.download_progress_info_var.set(f'{DOWNLOADING_ITEM} {model_num}/{len(self.download_demucs_newer_models)}...')
                             if os.path.isfile(model_data[0]):
                                 continue
                             else:
@@ -6177,7 +6148,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             
         appropriate_storage = True
             
-        if int(free/1.074e+9) <= int(2):
+        if int(free/1.074e+9) <= 2:
             self.error_dialoge([STORAGE_ERROR[0], f'{STORAGE_ERROR[1]}{space_details}'])
             appropriate_storage = False
         
@@ -6231,9 +6202,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         
         init_text = 'Files' if is_dual else 'File'
         
-        text = '{init_text} {file_num}/{total_files} '.format(init_text=init_text,
-                                                              file_num=file_num,
-                                                              total_files=total_files)
+        text = f'{init_text} {file_num}/{total_files} '
         
         return text
 
@@ -6425,7 +6394,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
                 self.command_Text.write(time_elapsed())
                 playsound(FAIL_CHIME) if self.is_task_complete_var.get() else None
             else:
-                self.command_Text.write('{}{}'.format(process_complete_text, time_elapsed()))
+                self.command_Text.write(f'{process_complete_text}{time_elapsed()}')
                 playsound(COMPLETE_CHIME) if self.is_task_complete_var.get() else None
 
             self.process_end()
@@ -6684,7 +6653,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             self.process_end()
                         
         except Exception as e:
-            self.error_log_var.set("{}{}".format(error_text(self.chosen_process_method_var.get(), e), self.get_settings_list()))
+            self.error_log_var.set(f"{error_text(self.chosen_process_method_var.get(), e)}{self.get_settings_list()}")
             self.command_Text.write(f'\n\n{PROCESS_FAILED}')
             self.command_Text.write(time_elapsed())
             playsound(FAIL_CHIME) if self.is_task_complete_var.get() else None
@@ -6724,7 +6693,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         
         for key, value in DEFAULT_DATA.items():
             if not key in data.keys():
-                data = {**data, **{key:value}}
+                data = {**data, key:value}
                 data['batch_size'] = DEF_OPT
 
         ## ADD_BUTTON
@@ -6871,8 +6840,8 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         """Loads user saved application settings or resets to default"""
         
         for key, value in DEFAULT_DATA.items():
-            if not key in loaded_setting.keys():
-                loaded_setting = {**loaded_setting, **{key:value}}
+            if not key in loaded_setting:
+                loaded_setting = {**loaded_setting, key:value}
                 loaded_setting['batch_size'] = DEF_OPT
                 
         is_default_reset = True if process_method == ENSEMBLE_MODE or is_default_reset else False
@@ -7157,7 +7126,7 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
             
             if is_restart:
                 try:
-                    subprocess.Popen(f'UVR_Launcher.exe')
+                    subprocess.Popen('UVR_Launcher.exe')
                 except Exception:
                     subprocess.Popen(f'python "{__file__}"', shell=True)
             
@@ -7183,7 +7152,7 @@ def read_bulliten_text_mac(path, data):
         if os.path.isfile(path):
             with open(path, 'r') as file :
                 data = file.read().replace("~", "•")
-    except Exception as e:
+    except Exception:
         data = 'No information available.'
 
     return data

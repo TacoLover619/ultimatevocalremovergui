@@ -8,7 +8,6 @@ This code contains the spectrogram and Hybrid version of Demucs.
 """
 from copy import deepcopy
 import math
-import typing as tp
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -17,7 +16,7 @@ from .demucs import DConv, rescale_module
 from .states import capture_init
 from .spec import spectro, ispectro
 
-def pad1d(x: torch.Tensor, paddings: tp.Tuple[int, int], mode: str = 'constant', value: float = 0.):
+def pad1d(x: torch.Tensor, paddings: tuple[int, int], mode: str = 'constant', value: float = 0.):
     """Tiny wrapper around F.pad, just to allow for reflect padding on small input.
     If this is the case, we insert extra 0 padding to the right before the reflection happen."""
     x0 = x
@@ -64,7 +63,7 @@ class ScaledEmbedding(nn.Module):
 
 class HEncLayer(nn.Module):
     def __init__(self, chin, chout, kernel_size=8, stride=4, norm_groups=1, empty=False,
-                 freq=True, dconv=True, norm=True, context=0, dconv_kw={}, pad=True,
+                 freq=True, dconv=True, norm=True, context=0, dconv_kw=None, pad=True,
                  rewrite=True):
         """Encoder layer. This used both by the time and the frequency branch.
 
@@ -84,9 +83,9 @@ class HEncLayer(nn.Module):
             rewrite: add 1x1 conv at the end of the layer.
         """
         super().__init__()
-        norm_fn = lambda d: nn.Identity()  # noqa
+        norm_fn = lambda d: nn.Identity()
         if norm:
-            norm_fn = lambda d: nn.GroupNorm(norm_groups, d)  # noqa
+            norm_fn = lambda d: nn.GroupNorm(norm_groups, d)
         if pad:
             pad = kernel_size // 4
         else:
@@ -114,6 +113,7 @@ class HEncLayer(nn.Module):
 
         self.dconv = None
         if dconv:
+            dconv_kw = {} if dconv_kw is None else dconv_kw
             self.dconv = DConv(chout, **dconv_kw)
 
     def forward(self, x, inject=None):
@@ -189,7 +189,7 @@ class MultiWrap(nn.Module):
             self.layers.append(lay)
 
     def forward(self, x, skip=None, length=None):
-        B, C, Fr, T = x.shape
+        _B, _C, Fr, _T = x.shape
 
         ratios = list(self.split_ratios) + [1]
         start = 0
@@ -251,15 +251,15 @@ class MultiWrap(nn.Module):
 
 class HDecLayer(nn.Module):
     def __init__(self, chin, chout, last=False, kernel_size=8, stride=4, norm_groups=1, empty=False,
-                 freq=True, dconv=True, norm=True, context=1, dconv_kw={}, pad=True,
+                 freq=True, dconv=True, norm=True, context=1, dconv_kw=None, pad=True,
                  context_freq=True, rewrite=True):
         """
         Same as HEncLayer but for decoder. See `HEncLayer` for documentation.
         """
         super().__init__()
-        norm_fn = lambda d: nn.Identity()  # noqa
+        norm_fn = lambda d: nn.Identity()
         if norm:
-            norm_fn = lambda d: nn.GroupNorm(norm_groups, d)  # noqa
+            norm_fn = lambda d: nn.GroupNorm(norm_groups, d)
         if pad:
             pad = kernel_size // 4
         else:
@@ -295,6 +295,7 @@ class HDecLayer(nn.Module):
 
         self.dconv = None
         if dconv:
+            dconv_kw = {} if dconv_kw is None else dconv_kw
             self.dconv = DConv(chin, **dconv_kw)
 
     def forward(self, x, skip, length):
@@ -585,8 +586,6 @@ class HDemucs(nn.Module):
     def _spec(self, x):
         hl = self.hop_length
         nfft = self.nfft
-        x0 = x  # noqa
-
         if self.hybrid:
             # We re-pad the signal in order to keep the property
             # that the size of the output is exactly the size of the input
@@ -644,7 +643,7 @@ class HDemucs(nn.Module):
         # If `cac` is True, `m` is actually a full spectrogram and `z` is ignored.
         niters = self.wiener_iters
         if self.cac:
-            B, S, C, Fr, T = m.shape
+            B, S, _C, Fr, T = m.shape
             out = m.view(B, S, -1, 2, Fr, T).permute(0, 1, 2, 4, 5, 3)
             out = torch.view_as_complex(out.contiguous())
             return out
@@ -692,7 +691,7 @@ class HDemucs(nn.Module):
         mag = self._magnitude(z).to(mix.device)
         x = mag
 
-        B, C, Fq, T = x.shape
+        B, _C, Fq, T = x.shape
 
         # unlike previous Demucs, we always normalize because it is easier.
         mean = x.mean(dim=(1, 2, 3), keepdim=True)

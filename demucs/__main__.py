@@ -116,7 +116,7 @@ def main():
 
     try:
         saved = th.load(checkpoint, map_location='cpu')
-    except IOError:
+    except OSError:
         saved = SavedState()
     else:
         model.load_state_dict(saved.last_state)

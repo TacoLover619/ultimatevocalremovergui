@@ -10,13 +10,11 @@ inteprolation between chunks, as well as the "shift trick".
 from concurrent.futures import ThreadPoolExecutor
 import random
 import typing as tp
-from multiprocessing import Process,Queue,Pipe
 
 import torch as th
 from torch import nn
 from torch.nn import functional as F
 import tqdm
-import tkinter as tk
 
 from .demucs import Demucs
 from .hdemucs import HDemucs
@@ -27,9 +25,9 @@ Model = tp.Union[Demucs, HDemucs]
 progress_bar_num = 0
 
 class BagOfModels(nn.Module):
-    def __init__(self, models: tp.List[Model],
-                 weights: tp.Optional[tp.List[tp.List[float]]] = None,
-                 segment: tp.Optional[float] = None):
+    def __init__(self, models: list[Model],
+                 weights: list[list[float]] | None = None,
+                 segment: float | None = None):
         """
         Represents a bag of models with specific weights.
         You should call `apply_model` rather than calling directly the forward here for
@@ -292,7 +290,7 @@ def demucs_segments(demucs_segment, demucs_model):
             else:
                 if segment is not None:
                     sub.segment = segment
-        except:
+        except Exception:
             segment = None
             if isinstance(demucs_model, BagOfModels):
                 if segment is not None:

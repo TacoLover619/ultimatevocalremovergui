@@ -9,7 +9,7 @@ import random
 import typing as tp
 
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 import numpy as np
 import math
@@ -44,7 +44,7 @@ def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=100
     if d_model % 4 != 0:
         raise ValueError(
             "Cannot use sin/cos positional encoding with "
-            "odd dimension (got dim={:d})".format(d_model)
+            f"odd dimension (got dim={d_model:d})"
         )
     pe = torch.zeros(d_model, height, width)
     # Each dimension use half of d_model
@@ -343,7 +343,7 @@ class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
         """
         device = src.device
         x = src
-        T, B, C = x.shape
+        T, _B, _C = x.shape
         if self.sparse and not self.auto_sparsity:
             assert src_mask is None
             src_mask = self.src_mask
@@ -472,8 +472,8 @@ class CrossTransformerEncoderLayer(nn.Module):
 
         """
         device = q.device
-        T, B, C = q.shape
-        S, B, C = k.shape
+        T, _, _ = q.shape
+        S, _B, _C = k.shape
         if self.sparse and not self.auto_sparsity:
             assert mask is None
             mask = self.mask
@@ -517,7 +517,7 @@ class CrossTransformerEncoderLayer(nn.Module):
         elif activation == "gelu":
             return F.gelu
 
-        raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
+        raise RuntimeError(f"activation should be relu/gelu, not {activation}")
 
 
 # ----------------- MULTI-BLOCKS MODELS: -----------------------
@@ -541,14 +541,14 @@ class CrossTransformerEncoder(nn.Module):
         norm_out: bool = False,
         max_period: float = 10000.0,
         weight_decay: float = 0.0,
-        lr: tp.Optional[float] = None,
+        lr: float | None = None,
         layer_scale: bool = False,
         gelu: bool = True,
         sin_random_shift: int = 0,
         weight_pos_embed: float = 1.0,
         cape_mean_normalize: bool = True,
         cape_augment: bool = True,
-        cape_glob_loc_scale: list = [5000.0, 1.0, 1.4],
+        cape_glob_loc_scale: tuple = (5000.0, 1.0, 1.4),
         sparse_self_attn: bool = False,
         sparse_cross_attn: bool = False,
         mask_type: str = "diag",

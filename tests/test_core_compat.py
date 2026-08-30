@@ -14,7 +14,9 @@ from lib_v5 import spec_utils
 from lib_v5.tfc_tdf_v3 import STFT
 from separate import (
     backend_output_to_tensor,
+    convert_onnx_model,
     load_mdx_checkpoint,
+    load_vr_denoiser_model,
     output_path_for_format,
     prepare_mix,
     select_onnx_providers,
@@ -45,9 +47,51 @@ class CoreCompatibilityTests(unittest.TestCase):
         imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'separate.py')
         self.assertIn('torch', imports)
         torch_index = imports.index('torch')
-        for module_name in ('scipy', 'audioread', 'librosa', 'onnxruntime'):
+        for module_name in ('scipy', 'audioread', 'librosa'):
             self.assertIn(module_name, imports)
             self.assertLess(torch_index, imports.index(module_name))
+
+    def test_optional_gui_features_are_not_imported_at_startup(self):
+        imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'UVR.py')
+        self.assertNotIn('matchering', imports)
+        self.assertNotIn('onnx', imports)
+
+    def test_startup_cleanup_preserves_application_text_files(self):
+        source = (Path(__file__).resolve().parents[1] / 'UVR.py').read_text(
+            encoding='utf-8'
+        )
+        self.assertIn("EXTENSIONS = ('.aes', '.tmp')", source)
+        self.assertNotIn("('.aes', '.txt', '.tmp')", source)
+
+    def test_optional_onnx_converter_is_not_imported_at_startup(self):
+        imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'separate.py')
+        self.assertNotIn('onnx', imports)
+        self.assertNotIn('onnx2pytorch', imports)
+        self.assertNotIn('onnxruntime', imports)
+
+    def test_lazy_onnx_converter_preserves_model_output(self):
+        import onnx
+        from onnx import TensorProto, helper
+
+        graph = helper.make_graph(
+            [helper.make_node('Relu', ['input'], ['output'])],
+            'relu',
+            [helper.make_tensor_value_info('input', TensorProto.FLOAT, [1, 2])],
+            [helper.make_tensor_value_info('output', TensorProto.FLOAT, [1, 2])],
+        )
+        model = helper.make_model(
+            graph,
+            opset_imports=[helper.make_opsetid('', 13)],
+            ir_version=8,
+        )
+
+        with TemporaryDirectory() as directory:
+            model_path = Path(directory) / 'relu.onnx'
+            onnx.save(model, model_path)
+            converted = convert_onnx_model(model_path).eval()
+
+        output = converted(torch.tensor([[-1.0, 2.0]]))
+        self.assertTrue(torch.equal(output, torch.tensor([[0.0, 2.0]])))
 
     def test_pillow_resize_uses_supported_resampling_api(self):
         source = (
@@ -57,7 +101,7 @@ class CoreCompatibilityTests(unittest.TestCase):
         self.assertIn('Image.Resampling.LANCZOS', source)
 
     def test_release_version(self):
-        self.assertEqual(VERSION, 'v6.0.0')
+        self.assertEqual(VERSION, 'v6.0.1')
 
     def test_windows_lock_avoids_pytorch_29_dll_regression(self):
         lock_file = Path(__file__).resolve().parents[1] / 'requirements-windows.lock.txt'
@@ -92,6 +136,18 @@ class CoreCompatibilityTests(unittest.TestCase):
         )
         self.assertIn('$RequiredBinaries = @(', definition)
         self.assertIn('Required bundled binary is missing:', definition)
+
+    def test_windows_package_excludes_unused_pytorch_tooling(self):
+        spec = (Path(__file__).resolve().parents[1] / 'UVR-Windows.spec').read_text(
+            encoding='utf-8'
+        )
+        for module_name in (
+            'torch._dynamo',
+            'torch._inductor',
+            'torch.utils.benchmark',
+            'torch.utils.tensorboard',
+        ):
+            self.assertIn(repr(module_name), spec)
 
     def test_missing_demucs_repository_reports_model_loading_error(self):
         with TemporaryDirectory() as directory:
@@ -183,6 +239,33 @@ class CoreCompatibilityTests(unittest.TestCase):
 
         self.assertEqual(output.shape, audio.shape)
         self.assertTrue(np.isfinite(output).all())
+
+    def test_vr_denoiser_reuses_unchanged_model(self):
+        load_vr_denoiser_model.cache_clear()
+        model_path = str(
+            (Path(__file__).resolve().parents[1] / 'models' / 'VR_Models' / 'UVR-DeNoise-Lite.pth')
+        )
+        modified_time = Path(model_path).stat().st_mtime
+
+        first = load_vr_denoiser_model(
+            model_path,
+            modified_time,
+            'cpu',
+            2048,
+            16,
+            128,
+        )
+        second = load_vr_denoiser_model(
+            model_path,
+            modified_time,
+            'cpu',
+            2048,
+            16,
+            128,
+        )
+
+        self.assertIs(first, second)
+        self.assertEqual(load_vr_denoiser_model.cache_info().hits, 1)
 
     def test_vr_denoiser_preserves_finite_silence(self):
         audio = np.zeros((2, 44_100), dtype=np.float32)
@@ -290,9 +373,9 @@ class CoreCompatibilityTests(unittest.TestCase):
         rerun_mp3.assert_called_once_with('silent-decode.MP3')
         self.assertTrue(np.all(prepared == 1))
 
-    @patch('separate.ort.get_available_providers')
-    def test_onnx_cuda_provider_keeps_cpu_fallback(self, available_providers):
-        available_providers.return_value = [
+    @patch('separate.get_onnxruntime')
+    def test_onnx_cuda_provider_keeps_cpu_fallback(self, get_onnxruntime):
+        get_onnxruntime.return_value.get_available_providers.return_value = [
             'CUDAExecutionProvider',
             'CPUExecutionProvider',
         ]
@@ -304,12 +387,14 @@ class CoreCompatibilityTests(unittest.TestCase):
             ['CUDAExecutionProvider', 'CPUExecutionProvider'],
         )
 
-    @patch('separate.ort.get_available_providers')
+    @patch('separate.get_onnxruntime')
     def test_onnx_provider_falls_back_when_cuda_is_unavailable(
         self,
-        available_providers,
+        get_onnxruntime,
     ):
-        available_providers.return_value = ['CPUExecutionProvider']
+        get_onnxruntime.return_value.get_available_providers.return_value = [
+            'CPUExecutionProvider'
+        ]
 
         providers = select_onnx_providers(use_cuda=True)
 

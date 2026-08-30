@@ -50,7 +50,7 @@ class ModelOnlyRepo:
 
 
 class RemoteRepo(ModelOnlyRepo):
-    def __init__(self, models: tp.Dict[str, str]):
+    def __init__(self, models: dict[str, str]):
         self._models = models
 
     def has_model(self, sig: str) -> bool:
@@ -124,7 +124,8 @@ class BagOnlyRepo:
         except KeyError:
             raise ModelLoadingError(f'{name} is neither a single pre-trained model or '
                                     'a bag of models.')
-        bag = yaml.safe_load(open(yaml_file))
+        with open(yaml_file, encoding='utf-8') as bag_file:
+            bag = yaml.safe_load(bag_file)
         signatures = bag['models']
         models = [self.model_repo.get_model(sig) for sig in signatures]
         weights = bag.get('weights')

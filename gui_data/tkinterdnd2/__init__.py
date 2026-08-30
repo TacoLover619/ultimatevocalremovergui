@@ -22,4 +22,6 @@ from . import TkinterDnD
 from .TkinterDnD import Tk
 from .TkinterDnD import TixTk
 
+__all__ = ['DND_FILES', 'DND_TEXT', 'TixTk', 'Tk', 'TkinterDnD']
+
 

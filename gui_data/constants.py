@@ -101,13 +101,7 @@ DONATE_LINK_PATREON = "https://www.patreon.com/uvr"
 
 #DOWNLOAD REPOS
 NORMAL_REPO = "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/"
-UPDATE_REPO = "https://github.com/TRvlvr/model_repo/releases/download/uvr_update_patches/"
-
-UPDATE_MAC_ARM_REPO = "https://github.com/Anjok07/ultimatevocalremovergui/releases/download/v5.6/Ultimate_Vocal_Remover_v5_6_MacOS_arm64.dmg"
-UPDATE_MAC_X86_64_REPO = "https://github.com/Anjok07/ultimatevocalremovergui/releases/download/v5.6/Ultimate_Vocal_Remover_v5_6_MacOS_x86_64.dmg"
-UPDATE_LINUX_REPO = "https://github.com/Anjok07/ultimatevocalremovergui#linux-installation"
-
-ISSUE_LINK = 'https://github.com/Anjok07/ultimatevocalremovergui/issues/new'
+ISSUE_LINK = 'https://github.com/TacoLover619/ultimatevocalremovergui/issues/new'
 VIP_REPO = b'\xf3\xc2W\x19\x1foI)\xc2\xa9\xcc\xb67(Z\xf5',\
            b'gAAAAABjQAIQ-NpNMMxMedpKHHb7ze_nqB05hw0YhbOy3pFzuzDrfqumn8_qvraxEoUpZC5ZXC0gGvfDxFMqyq9VWbYKlA67SUFI_wZB6QoVyGI581vs7kaGfUqlXHIdDS6tQ_U-BfjbEAK9EU_74-R2zXjz8Xzekw=='
 NO_CODE = 'incorrect_code'
@@ -168,8 +162,8 @@ VOCAL_STEM_ONLY = f'{VOCAL_STEM} Only'
 INST_STEM_ONLY = f'{INST_STEM} Only'
 PRIMARY_STEM_ONLY = f'{PRIMARY_STEM} Only'
 
-IS_SAVE_INST_ONLY = f'save_only_inst'
-IS_SAVE_VOC_ONLY = f'save_only_voc'
+IS_SAVE_INST_ONLY = 'save_only_inst'
+IS_SAVE_VOC_ONLY = 'save_only_voc'
 
 DEVERB_MAPPER = {'Main Vocals Only':VOCAL_STEM, 
                  'Lead Vocals Only':LEAD_VOCAL_STEM_LABEL, 
@@ -373,7 +367,7 @@ NOUT_LSTM_SEL = (64, 128)
 DEMUCS_OVERLAP = (0.25, 0.50, 0.75, 0.99)
 MDX_OVERLAP = (DEF_OPT, 0.25, 0.50, 0.75, 0.99)
 MDX23_OVERLAP = range(2, 51)
-VR_AGGRESSION = range(0, 51)
+VR_AGGRESSION = range(51)
 
 TIME_WINDOW_MAPPER = {
             "None": None,
@@ -403,10 +397,10 @@ INTRO_MAPPER = {
 
 VOLUME_MAPPER = {
             "None": (0, [0]),
-            "Low": (-4, range(0, 8)),
-            "Medium": (-6, range(0, 12)),
-            "High": (-6, [x * 0.5 for x in range(0, 25)]),
-            "Very High": (-10, [x * 0.5 for x in range(0, 41)])}
+            "Low": (-4, range(8)),
+            "Medium": (-6, range(12)),
+            "High": (-6, [x * 0.5 for x in range(25)]),
+            "Very High": (-10, [x * 0.5 for x in range(41)])}
             #"Max": (-10, [x * 0.3 for x in range(0, int(20 / 0.3) + 1)])}
 
 PHASE_MAPPER = {
@@ -1574,7 +1568,7 @@ def secondary_stem(stem:str):
     
     stem = stem if stem else NO_STEM
     
-    if stem in STEM_PAIR_MAPPER.keys():
+    if stem in STEM_PAIR_MAPPER:
         for key, value in STEM_PAIR_MAPPER.items():
             if stem in key:
                 secondary_stem = value

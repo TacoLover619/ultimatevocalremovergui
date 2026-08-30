@@ -1,0 +1,45 @@
+name: Increment patch version
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: increment-patch-version
+  cancel-in-progress: false
+
+jobs:
+  increment:
+    if: ${{ !contains(github.event.head_commit.message, '[version increment]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check whether the incoming update already changed the version
+        id: version
+        shell: bash
+        run: |
+          if git diff --quiet HEAD^ HEAD -- __version__.py; then
+            echo "bump=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Increment patch version
+        if: steps.version.outputs.bump == 'true'
+        run: python scripts/bump_patch_version.py
+
+      - name: Commit increment
+        if: steps.version.outputs.bump == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add __version__.py UVR-Windows.iss WINDOWS_BUILD.md tests/test_core_compat.py
+          git commit -m "build: increment patch version [version increment]"
+          git push

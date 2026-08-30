@@ -281,7 +281,7 @@ def wave_to_spectrogram(wave, hop_length, n_fft, mp, band, is_v51_model=False):
 
     return spec
 
-def spectrogram_to_wave(spec, hop_length=1024, mp={}, band=0, is_v51_model=True):
+def spectrogram_to_wave(spec, hop_length=1024, mp=None, band=0, is_v51_model=True):
     spec_left = np.asfortranarray(spec[0])
     spec_right = np.asfortranarray(spec[1])
     
@@ -676,7 +676,7 @@ def adjust_leading_silence(target_audio, reference_audio, silence_threshold=0.01
         target_silence_end_p = (target_silence_end / 44100) * 1000
         silence_difference_p = ref_silence_end_p - target_silence_end_p
         print("silence_difference: ", silence_difference_p)
-    except Exception as e:
+    except Exception:
         pass
 
     if silence_difference > 0:  # Add silence to target_audio
@@ -923,9 +923,9 @@ def align_audio(file1,
 
     if file2.endswith(".mp3") and is_macos:
         length2 = rerun_mp3(file2)
-        wav2, sr2 = librosa.load(file2, duration=length2, sr=44100, mono=False)
+        wav2, _ = librosa.load(file2, duration=length2, sr=44100, mono=False)
     else:
-        wav2, sr2 = librosa.load(file2, sr=44100, mono=False)
+        wav2, _ = librosa.load(file2, sr=44100, mono=False)
 
     if wav1.ndim == 1 and wav2.ndim == 1:
          is_mono = True
@@ -972,9 +972,7 @@ def align_audio(file1,
         else:
             index = sr1*sec_seg  # 1 second in, assuming sr1 = sr2 = 44100
             samp1, samp2 = wav1[index : index + sr1, 0], wav2[index : index + sr1, 0]
-            samp1_r, samp2_r = wav1[index : index + sr1, 1], wav2[index : index + sr1, 1]
-            diff, diff_r = get_diff(samp1, samp2), get_diff(samp1_r, samp2_r)
-            #print(f"Estimated difference Left Channel: {diff}\nEstimated difference Right Channel: {diff_r}\n")
+            diff = get_diff(samp1, samp2)
         
         # make aligned track 2
         if diff > 0:
@@ -1001,7 +999,7 @@ def align_audio(file1,
         if align_window:
             wav_sub = time_correction(wav1, wav2_aligned, seconds_length, align_window=align_window, db_analysis=db_analysis, progress_bar=progress_bar, unique_sources=unique_sources, phase_shifts=phase_shifts)
             wav_sub_size = np.abs(wav_sub).mean()  
-            sub_mapper_big_mapper = {**sub_mapper_big_mapper, **{wav_sub_size:wav_sub}}
+            sub_mapper_big_mapper = {**sub_mapper_big_mapper, wav_sub_size:wav_sub}
         else:
             wav2_aligned = wav2_aligned * np.power(10, db_analysis[0] / 20)
             db_range = db_analysis[1]
@@ -1011,7 +1009,7 @@ def align_audio(file1,
                 s_adjusted = wav2_aligned * (10 ** (db_adjustment / 20))
                 wav_sub = wav1 - s_adjusted
                 wav_sub_size = np.abs(wav_sub).mean() 
-                sub_mapper_big_mapper = {**sub_mapper_big_mapper, **{wav_sub_size:wav_sub}}
+                sub_mapper_big_mapper = {**sub_mapper_big_mapper, wav_sub_size:wav_sub}
             
         #print(sub_mapper_big_mapper.keys(), min(sub_mapper_big_mapper.keys()))
     
@@ -1028,7 +1026,7 @@ def align_audio(file1,
     #print('Final: ', np.abs(wav_sub).mean())
     wav_sub = np.clip(wav_sub, -1, +1)
     
-    command_Text(f"Saving inverted track... ")
+    command_Text("Saving inverted track... ")
 
     if is_save_aligned or is_spec_match:
         wav1 = match_mono_array_shapes(wav1, wav_sub) if is_mono else match_array_shapes(wav1, wav_sub, is_swap=True)
@@ -1169,7 +1167,7 @@ def time_correction(mix:np.ndarray, instrumental:np.ndarray, seconds_length, ali
         # Normalize the result by the overlap count
         sub = np.where(divider > 1e-6, sub / divider, sub)
         sub_size = np.abs(sub).mean()
-        sub_mapper = {**sub_mapper, **{sub_size: sub}}
+        sub_mapper = {**sub_mapper, sub_size: sub}
 
     #print("SUB_LEN", len(list(sub_mapper.values())))
 
@@ -1244,7 +1242,7 @@ def align_audio_test(wav1, wav2, sr1=44100):
     return wav2_aligned
 
 def load_audio(audio_file):
-    wav, sr = librosa.load(audio_file, sr=44100, mono=False)
+    wav, _sr = librosa.load(audio_file, sr=44100, mono=False)
 
     if wav.ndim == 1:
         wav = np.asfortranarray([wav,wav])

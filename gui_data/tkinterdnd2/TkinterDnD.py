@@ -78,7 +78,6 @@ class DnDEvent:
         y_root (int)
     Depending on the type of DnD event however, not all attributes may be set.
     """
-    pass
 
 class DnDWrapper:
     '''Internal class.'''
