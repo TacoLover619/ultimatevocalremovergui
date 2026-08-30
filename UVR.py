@@ -724,7 +724,6 @@ class ModelData():
         
         if not os.path.isfile(self.model_path):
             self.model_status = False
-            self.model_hash is None
         else:
             if model_hash_table:
                 for (key, value) in model_hash_table.items():
