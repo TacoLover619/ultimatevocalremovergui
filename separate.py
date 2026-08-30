@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 
@@ -1458,9 +1459,12 @@ def pitch_shift(mix):
     
     return resampled_audio
 
-def list_to_dictionary(lst):
-    dictionary = {item: index for index, item in enumerate(lst)}
-    return dictionary
+@lru_cache(maxsize=4)
+def load_vr_denoiser_model(model_path, modified_time, device, n_fft, nout, nout_lstm):
+    model = nets_new.CascadedNet(n_fft, nout=nout, nout_lstm=nout_lstm)
+    model.load_state_dict(torch.load(model_path, map_location=cpu, weights_only=True))
+    return model.to(torch.device(device)).eval()
+
 
 def vr_denoiser(X, device, hop_length=1024, n_fft=2048, cropsize=256, is_deverber=False, model_path=None):
     batchsize = 4
@@ -1474,9 +1478,15 @@ def vr_denoiser(X, device, hop_length=1024, n_fft=2048, cropsize=256, is_deverbe
         hop_length=1024
         nout, nout_lstm = 16, 128
     
-    model = nets_new.CascadedNet(n_fft, nout=nout, nout_lstm=nout_lstm)
-    model.load_state_dict(torch.load(model_path, map_location=cpu, weights_only=True))
-    model.to(device)
+    resolved_model_path = os.path.abspath(model_path)
+    model = load_vr_denoiser_model(
+        resolved_model_path,
+        os.path.getmtime(resolved_model_path),
+        str(device),
+        n_fft,
+        nout,
+        nout_lstm,
+    )
 
     if mp is None:
         X_spec = spec_utils.wave_to_spectrogram_old(X, hop_length, n_fft)
@@ -1502,8 +1512,6 @@ def vr_denoiser(X, device, hop_length=1024, n_fft=2048, cropsize=256, is_deverbe
 
     X_dataset = np.asarray(X_dataset)
 
-    model.eval()
-    
     with torch.no_grad():
         mask = []
         # To reduce the overhead, dataloader is not used.

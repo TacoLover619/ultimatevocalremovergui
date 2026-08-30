@@ -16,6 +16,7 @@ from separate import (
     backend_output_to_tensor,
     convert_onnx_model,
     load_mdx_checkpoint,
+    load_vr_denoiser_model,
     output_path_for_format,
     prepare_mix,
     select_onnx_providers,
@@ -219,6 +220,33 @@ class CoreCompatibilityTests(unittest.TestCase):
 
         self.assertEqual(output.shape, audio.shape)
         self.assertTrue(np.isfinite(output).all())
+
+    def test_vr_denoiser_reuses_unchanged_model(self):
+        load_vr_denoiser_model.cache_clear()
+        model_path = str(
+            (Path(__file__).resolve().parents[1] / 'models' / 'VR_Models' / 'UVR-DeNoise-Lite.pth')
+        )
+        modified_time = Path(model_path).stat().st_mtime
+
+        first = load_vr_denoiser_model(
+            model_path,
+            modified_time,
+            'cpu',
+            2048,
+            16,
+            128,
+        )
+        second = load_vr_denoiser_model(
+            model_path,
+            modified_time,
+            'cpu',
+            2048,
+            16,
+            128,
+        )
+
+        self.assertIs(first, second)
+        self.assertEqual(load_vr_denoiser_model.cache_info().hits, 1)
 
     def test_vr_denoiser_preserves_finite_silence(self):
         audio = np.zeros((2, 44_100), dtype=np.float32)
