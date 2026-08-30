@@ -25,7 +25,6 @@ import urllib.request
 import webbrowser
 import wget
 import traceback
-import matchering as match
 import tkinter as tk
 from tkinter import ttk
 from tkinter.font import Font
@@ -52,7 +51,6 @@ from separate import (
     cuda_available, mps_available, #directml_available,
 )
 from playsound import playsound
-import onnx
 import re
 import sys
 import yaml
@@ -885,6 +883,7 @@ class AudioTools:
                                is_spec_match=self.is_spec_match)
         
     def match_inputs(self, audio_inputs, audio_file_base, command_Text):
+        import matchering as match
         
         target = audio_inputs[0]
         reference = audio_inputs[1]
@@ -4607,6 +4606,8 @@ class MainWindow(TkinterDnD.Tk if is_dnd_compatible else tk.Tk):
         
         try:
             if model_path.endswith(ONNX):
+                import onnx
+
                 model = onnx.load(model_path)
                 model_shapes = [[d.dim_value for d in _input.type.tensor_type.shape.dim] for _input in model.graph.input][0]
                 dim_f = model_shapes[2]

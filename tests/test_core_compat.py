@@ -46,14 +46,20 @@ class CoreCompatibilityTests(unittest.TestCase):
         imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'separate.py')
         self.assertIn('torch', imports)
         torch_index = imports.index('torch')
-        for module_name in ('scipy', 'audioread', 'librosa', 'onnxruntime'):
+        for module_name in ('scipy', 'audioread', 'librosa'):
             self.assertIn(module_name, imports)
             self.assertLess(torch_index, imports.index(module_name))
+
+    def test_optional_gui_features_are_not_imported_at_startup(self):
+        imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'UVR.py')
+        self.assertNotIn('matchering', imports)
+        self.assertNotIn('onnx', imports)
 
     def test_optional_onnx_converter_is_not_imported_at_startup(self):
         imports = self._top_level_imports(Path(__file__).resolve().parents[1] / 'separate.py')
         self.assertNotIn('onnx', imports)
         self.assertNotIn('onnx2pytorch', imports)
+        self.assertNotIn('onnxruntime', imports)
 
     def test_lazy_onnx_converter_preserves_model_output(self):
         import onnx
@@ -320,9 +326,9 @@ class CoreCompatibilityTests(unittest.TestCase):
         rerun_mp3.assert_called_once_with('silent-decode.MP3')
         self.assertTrue(np.all(prepared == 1))
 
-    @patch('separate.ort.get_available_providers')
-    def test_onnx_cuda_provider_keeps_cpu_fallback(self, available_providers):
-        available_providers.return_value = [
+    @patch('separate.get_onnxruntime')
+    def test_onnx_cuda_provider_keeps_cpu_fallback(self, get_onnxruntime):
+        get_onnxruntime.return_value.get_available_providers.return_value = [
             'CUDAExecutionProvider',
             'CPUExecutionProvider',
         ]
@@ -334,12 +340,14 @@ class CoreCompatibilityTests(unittest.TestCase):
             ['CUDAExecutionProvider', 'CPUExecutionProvider'],
         )
 
-    @patch('separate.ort.get_available_providers')
+    @patch('separate.get_onnxruntime')
     def test_onnx_provider_falls_back_when_cuda_is_unavailable(
         self,
-        available_providers,
+        get_onnxruntime,
     ):
-        available_providers.return_value = ['CPUExecutionProvider']
+        get_onnxruntime.return_value.get_available_providers.return_value = [
+            'CPUExecutionProvider'
+        ]
 
         providers = select_onnx_providers(use_cuda=True)
 

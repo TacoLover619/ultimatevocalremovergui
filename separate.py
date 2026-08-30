@@ -37,7 +37,6 @@ import gzip
 import librosa
 import math
 import numpy as np
-import onnxruntime as ort
 import warnings
 import pydub
 import soundfile as sf
@@ -124,8 +123,14 @@ def convert_onnx_model(model_path):
     return ConvertModel(load(model_path))
 
 
+def get_onnxruntime():
+    import onnxruntime
+
+    return onnxruntime
+
+
 def select_onnx_providers(use_cuda):
-    available_providers = ort.get_available_providers()
+    available_providers = get_onnxruntime().get_available_providers()
     if use_cuda and 'CUDAExecutionProvider' in available_providers:
         return ['CUDAExecutionProvider', 'CPUExecutionProvider']
     return ['CPUExecutionProvider']
@@ -553,7 +558,10 @@ class SeperateMDX(SeperateAttributes):
                 self.dim_c, self.hop = model_params['dim_c'], model_params['hop_length']
             else:
                 if self.mdx_segment_size == self.dim_t and not self.is_other_gpu:
-                    ort_ = ort.InferenceSession(self.model_path, providers=self.run_type)
+                    ort_ = get_onnxruntime().InferenceSession(
+                        self.model_path,
+                        providers=self.run_type,
+                    )
                     self.model_run = lambda spek:ort_.run(None, {'input': spek.cpu().numpy()})[0]
                 else:
                     self.model_run = convert_onnx_model(self.model_path)
