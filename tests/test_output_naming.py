@@ -1,6 +1,10 @@
 from datetime import datetime
 
-from gui_data.output_naming import clean_output_base, default_output_directory
+from gui_data.output_naming import (
+    clean_output_base,
+    default_output_directory,
+    stem_output_filename,
+)
 from gui_data.constants import SELECT_OUTPUT_TEXT
 
 
@@ -29,3 +33,15 @@ def test_default_output_directory_matches_input(tmp_path):
 
 def test_output_control_selects_a_folder():
     assert SELECT_OUTPUT_TEXT == 'Select Output Folder'
+
+
+def test_single_stem_output_omits_redundant_stem_suffix():
+    assert stem_output_filename(
+        'voice_clean_2026-08-30_16-27-29',
+        'Vocals',
+        single_stem=True,
+    ) == 'voice_clean_2026-08-30_16-27-29.wav'
+
+
+def test_multi_stem_output_keeps_stem_suffixes_distinct():
+    assert stem_output_filename('voice_clean', 'Vocals') == 'voice_clean_(Vocals).wav'

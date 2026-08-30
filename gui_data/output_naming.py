@@ -13,3 +13,10 @@ def default_output_directory(input_paths):
     if not input_paths:
         return ''
     return str(Path(input_paths[0]).resolve().parent)
+
+
+def stem_output_filename(output_base, stem_name, single_stem=False):
+    """Build a stem filename without a redundant label for single-output jobs."""
+    if single_stem:
+        return f'{output_base}.wav'
+    return f'{output_base}_({stem_name}).wav'

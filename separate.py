@@ -32,6 +32,7 @@ from lib_v5.vr_network.model_param_init import ModelParameters
 from pathlib import Path
 from gui_data.constants import *
 from gui_data.error_handling import *
+from gui_data.output_naming import stem_output_filename
 from scipy import signal
 import audioread
 import gzip
@@ -477,6 +478,15 @@ class SeperateAttributes:
         self.write_audio(stem_path, source, samplerate, stem_name=stem_name)
         
         return {stem_name: source}
+
+    def stem_output_path(self, stem_name):
+        """Return a clean filename when processing is configured for one stem only."""
+        filename = stem_output_filename(
+            self.audio_file_base,
+            stem_name,
+            single_stem=self.is_primary_stem_only or self.is_secondary_stem_only,
+        )
+        return os.path.join(self.export_path, filename)
     
     def write_audio(self, stem_path: str, stem_source, samplerate, stem_name=None):
         
@@ -607,7 +617,7 @@ class SeperateMDX(SeperateAttributes):
             self.secondary_source_primary, self.secondary_source_secondary = process_secondary_model(self.secondary_model, self.process_data, main_process_method=self.process_method, main_model_primary=self.primary_stem)
         
         if not self.is_primary_stem_only:
-            secondary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.secondary_stem}).wav')
+            secondary_stem_path = self.stem_output_path(self.secondary_stem)
             if not isinstance(self.secondary_source, np.ndarray):
                 raw_mix = self.demix(self.match_frequency_pitch(mix), is_match_mix=True) if mdx_net_cut else self.match_frequency_pitch(mix)
                 self.secondary_source = spec_utils.invert_stem(raw_mix, source) if self.is_invert_spec else mix.T-source.T
@@ -615,7 +625,7 @@ class SeperateMDX(SeperateAttributes):
             self.secondary_source_map = self.final_process(secondary_stem_path, self.secondary_source, self.secondary_source_secondary, self.secondary_stem, samplerate)
         
         if not self.is_secondary_stem_only:
-            primary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.primary_stem}).wav')
+            primary_stem_path = self.stem_output_path(self.primary_stem)
 
             if not isinstance(self.primary_source, np.ndarray):
                 self.primary_source = source.T
@@ -792,7 +802,7 @@ class SeperateMDXC(SeperateAttributes):
                                                                                                          main_model_primary=self.primary_stem)
 
             if not self.is_primary_stem_only:
-                secondary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.secondary_stem}).wav')
+                secondary_stem_path = self.stem_output_path(self.secondary_stem)
                 if not isinstance(self.secondary_source, np.ndarray):
                     
                     if self.is_mdx_combine_stems and len(stem_list) >= 2:
@@ -818,7 +828,7 @@ class SeperateMDXC(SeperateAttributes):
                 self.secondary_source_map = self.final_process(secondary_stem_path, self.secondary_source, self.secondary_source_secondary, self.secondary_stem, samplerate)    
 
             if not self.is_secondary_stem_only:
-                primary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.primary_stem}).wav')
+                primary_stem_path = self.stem_output_path(self.primary_stem)
                 if not isinstance(self.primary_source, np.ndarray):
                     self.primary_source = source_primary.T
 
@@ -1063,7 +1073,7 @@ class SeperateDemucs(SeperateAttributes):
                     secondary_save(f"{self.secondary_stem} {INST_STEM}", source, raw_mixture=inst_mix, is_inst_mixture=True)
 
             if not self.is_secondary_stem_only:
-                primary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.primary_stem}).wav')
+                primary_stem_path = self.stem_output_path(self.primary_stem)
                 if not isinstance(self.primary_source, np.ndarray):
                     self.primary_source = source[self.demucs_source_map[self.primary_stem]].T
                 
@@ -1169,7 +1179,7 @@ class SeperateVR(SeperateAttributes):
             self.secondary_source_primary, self.secondary_source_secondary = process_secondary_model(self.secondary_model, self.process_data, main_process_method=self.process_method, main_model_primary=self.primary_stem)
 
         if not self.is_secondary_stem_only:
-            primary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.primary_stem}).wav')
+            primary_stem_path = self.stem_output_path(self.primary_stem)
             if not isinstance(self.primary_source, np.ndarray):
                 self.primary_source = self.spec_to_wav(y_spec).T
                 if not self.model_samplerate == 44100:
@@ -1178,7 +1188,7 @@ class SeperateVR(SeperateAttributes):
             self.primary_source_map = self.final_process(primary_stem_path, self.primary_source, self.secondary_source_primary, self.primary_stem, 44100)  
 
         if not self.is_primary_stem_only:
-            secondary_stem_path = os.path.join(self.export_path, f'{self.audio_file_base}_({self.secondary_stem}).wav')
+            secondary_stem_path = self.stem_output_path(self.secondary_stem)
             if not isinstance(self.secondary_source, np.ndarray):
                 self.secondary_source = self.spec_to_wav(v_spec).T
                 if not self.model_samplerate == 44100:
