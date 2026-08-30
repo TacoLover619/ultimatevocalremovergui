@@ -1358,32 +1358,42 @@ def gather_sources(primary_stem_name, secondary_stem_name, secondary_sources: di
 
     return source_primary, source_secondary
         
+def validate_audio_array(mix, allow_sample_first=False):
+    mix = np.asarray(mix)
+    if mix.ndim not in (1, 2):
+        raise ValueError('Audio arrays must be one-dimensional or two-dimensional')
+
+    if mix.ndim == 1:
+        mix = np.stack([mix, mix])
+    elif mix.shape[0] in (1, 2):
+        pass
+    elif allow_sample_first and mix.shape[1] in (1, 2):
+        mix = mix.T
+    else:
+        raise ValueError('Audio arrays must contain one or two channels')
+
+    if mix.shape[1] == 0:
+        raise ValueError('Audio input must contain at least one sample')
+    if not np.isfinite(mix).all():
+        raise ValueError('Audio input contains non-finite samples')
+    if mix.shape[0] == 1:
+        mix = np.repeat(mix, 2, axis=0)
+
+    return np.asfortranarray(mix)
+
+
 def prepare_mix(mix):
     audio_path = mix
+    is_array_input = isinstance(mix, np.ndarray)
 
-    if not isinstance(mix, np.ndarray):
+    if not is_array_input:
         mix, sr = librosa.load(mix, mono=False, sr=44100)
-    else:
-        if mix.ndim > 2:
-            raise ValueError('Audio arrays must be one-dimensional or two-dimensional')
-        if mix.ndim == 2:
-            if mix.shape[0] in (1, 2):
-                pass
-            elif mix.shape[1] in (1, 2):
-                mix = mix.T
-            else:
-                raise ValueError('Audio arrays must contain one or two channels')
 
     if isinstance(audio_path, str):
         if not np.any(mix) and audio_path.lower().endswith('.mp3'):
             mix = rerun_mp3(audio_path)
 
-    if mix.ndim == 1:
-        mix = np.asfortranarray([mix, mix])
-    elif mix.shape[0] == 1:
-        mix = np.repeat(mix, 2, axis=0)
-
-    return np.asfortranarray(mix)
+    return validate_audio_array(mix, allow_sample_first=is_array_input)
 
 
 def rerun_mp3(audio_file, sample_rate=44100):
